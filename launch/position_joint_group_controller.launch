@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+
+  <param name="PositionJointGroupController/type" value="qr_control/PositionJointGroupController" />
+
+  <rosparam command="load" file="$(find qr_control)/config/position_joint_group_controller.yaml" />
+
+
+  <!-- Spawn Controller -->
+  <node name="joint_controller_spawner"
+       pkg="controller_manager" type="spawner" respawn="false" output="screen"
+       args="--shutdown-timeout -1 PositionJointGroupController"  />
+
+  <!-- <node  name="gesture" pkg="qr_control" type="gesture" output="screen"/> -->
+
+</launch>
