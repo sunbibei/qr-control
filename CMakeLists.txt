@@ -12,17 +12,14 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES qr_control_lib
   CATKIN_DEPENDS kdl_parser
-  DEPENDS system_lib glog orocos_kdl
+  #DEPENDS system_lib glog orocos_kdl
 )
 
 
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 set(DDP_FILES
-  src/test_4_qr_walker.cpp
-  src/qr_walk_scheduler.cpp
   src/position_joint_group_controller.cpp
-  src/position_reset.cpp
   src/foot_contact.cpp
   src/swing.cpp
   src/math.cpp
