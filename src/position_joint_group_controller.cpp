@@ -128,6 +128,8 @@ namespace qr_control
 **************************************************************************/
 void PositionJointGroupController::update(const ros::Time& time, const ros::Duration& period)
 {
+  std::cout << "update at time " << time << std::endl;
+  return;
 	gesture->updateImuData();
 
 	foot_contact->footForceDataUpdate(*(td_handles_[0].getForce()), *(td_handles_[1].getForce()), *(td_handles_[2].getForce()), *(td_handles_[3].getForce()));
