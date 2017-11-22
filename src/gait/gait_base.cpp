@@ -11,6 +11,9 @@
 
 
 namespace qr_control {
+StateMachineBase::StateMachineBase()  { }
+
+StateMachineBase::~StateMachineBase() { }
 
 GaitBase::GaitBase(const MiiString& _l)
   : Label(_l) {
@@ -26,6 +29,29 @@ bool GaitBase::init() {
 
 GaitBase::~GaitBase() {
   // Nothing to do here.
+}
+
+void GaitBase::update() {
+  checkState();
+  if (nullptr == state_machine()) {
+    LOG_WARNING << "No StateMachine!";
+    return;
+  }
+  state_machine()->operator ()();
+}
+
+bool GaitBase::canSwitch() {
+  LOG_ERROR << "Call the base method 'canSwitch'";
+  return true;
+}
+
+void GaitBase::checkState() {
+  LOG_ERROR << "Call the base method 'checkState'";
+}
+
+StateMachineBase* GaitBase::state_machine() {
+  LOG_ERROR << "Call the base method 'checkState'";
+  return nullptr;
 }
 
 } /* namespace qr_control */

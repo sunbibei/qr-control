@@ -6,18 +6,14 @@
  */
 
 #include <gait/gait_manager.h>
-#include <system/foundation/cfg_reader.h>
 
 namespace qr_control {
 
-const unsigned int INVALID_GAIT_IDX = -1;
+SINGLETON_IMPL(GaitManager)
 
-SINGLETON_IMPL_NO_CREATE(GaitManager)
-
-GaitManager::GaitManager(const MiiString& prefix)
+GaitManager::GaitManager()
   : middleware::internal::ResourceManager<GaitBase>(),
-    Label(prefix),
-    current_active_gait_idx_(INVALID_GAIT_IDX) {
+    running_gait_(nullptr), active_gait_(nullptr) {
 
 }
 
@@ -25,12 +21,42 @@ GaitManager::~GaitManager() {
   // Nothing to do here.
 }
 
-// TODO
 bool GaitManager::init() {
-  auto cfg = MiiCfgReader::instance();
-  MiiString active_gait;
-  cfg->get_value(getLabel(), "active", active_gait);
+  for (auto gait : res_list_) {
+    gait_list_by_name_.insert(std::make_pair(gait->gaitName(), gait));
+  }
+
   return true;
+}
+
+void GaitManager::tick() {
+
+  if ((!running_gait_) && (!active_gait_)) {
+    return;
+  } else if ((!running_gait_) && (active_gait_)) {
+    running_gait_ = active_gait_;
+  } else if (running_gait_ != active_gait_) {
+    if (running_gait_->canSwitch())
+      running_gait_ = active_gait_;
+    else
+      LOG_EVERY_N(WARNING, 10) << "Waiting to switch from "
+        << running_gait_->gaitName() << " to " << active_gait_->gaitName();
+  } else { // runing_gait_ == active_gait_
+    ;
+  }
+
+  running_gait_->update();
+}
+
+void GaitManager::activate(const MiiString& gait_name) {
+  auto new_gait = gait_list_by_name_.find(gait_name);
+  if (gait_list_by_name_.end() == new_gait) {
+    LOG_WARNING << "No gait '" << gait_name << "' register in the gait manager.";
+    return;
+  }
+
+  LOG_INFO << "Switch the current gait to " << gait_name;
+  active_gait_ = new_gait->second;
 }
 
 } /* namespace qr_control */

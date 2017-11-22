@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<control name="qr-control-configure" >
+
+  <gait name="gait-repository">
+    <creep auto_inst="qr_control::Creep" name="creep" >
+      <count description="initilize the __PrivateParam"
+        init_pose="300" cali_imu="300" stance="1000" height="300" swing="1000" />
+    </creep>
+  </gait>
+
+</control>
