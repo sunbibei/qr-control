@@ -10,6 +10,8 @@
 #include <system/foundation/cfg_reader.h>
 #include <system/foundation/auto_instanceor.h>
 
+#include <Eigen/Dense>
+
 void __auto_inst(const MiiString& __p, const MiiString& __type) {
   LOG_INFO << "Create instance(" << __type << " " << __p;
   if (!AutoInstanceor::instance()->make_instance(__p, __type)) {

@@ -25,10 +25,19 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 
 set(SRC_ROOT          src)
 set(SRC_GAITS_ROOT    ${SRC_ROOT}/gait)
+set(SRC_ROBOT_ROOT    ${SRC_ROOT}/robot)
+set(SRC_ORIGIN_ROOT   ${SRC_ROBOT_ROOT}/origin)
 
 set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
                       ${SRC_GAITS_ROOT}/gait_base.cpp
                       ${SRC_GAITS_ROOT}/creep/creep.cpp
+)
+
+set(ROBOT_FILES       ${SRC_ORIGIN_ROOT}/origin.cpp
+                      ${SRC_ORIGIN_ROOT}/origin_test.cpp
+
+                      ${SRC_ROBOT_ROOT}/robot_leg.cpp
+                      ${SRC_ROBOT_ROOT}/robot_body.cpp
 )
 
 set(BIN_FILES         ${SRC_ROOT}/main.cpp
@@ -37,6 +46,7 @@ set(BIN_FILES         ${SRC_ROOT}/main.cpp
 ## Declare a C++ library
 add_library(${PROJECT_NAME}_repository
   ${GAIT_FILES}
+  ${ROBOT_FILES}
 )
 
 ## Declare a C++ executable
