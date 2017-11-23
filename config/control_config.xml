@@ -9,10 +9,17 @@
   </gait>
 
   <robot >
-    <lf auto_inst="qr_control::RobotLeg" jnt="fl" origin="fl_pos fl_cmd_pos fl_foot_force" />
-    <lf auto_inst="qr_control::RobotLeg" jnt="fr" origin="fr_pos fr_cmd_pos fr_foot_force" />
-    <lf auto_inst="qr_control::RobotLeg" jnt="hl" origin="hl_pos hl_cmd_pos hl_foot_force" />
-    <lf auto_inst="qr_control::RobotLeg" jnt="hr" origin="hr_pos hr_cmd_pos hr_foot_force" />
+    <lf auto_inst="qr_control::RobotLeg" jnt="fl" position="fl_pos"
+      command="fl_cmd_pos fl_cmd_vel fl_cmd_eff" tdlo="fl_foot_force" />
+
+    <lf auto_inst="qr_control::RobotLeg" jnt="fr" position="fr_pos"
+      command="fr_cmd_pos fr_cmd_vel fr_cmd_eff" tdlo="fr_foot_force" />
+
+    <lf auto_inst="qr_control::RobotLeg" jnt="hl" position="hl_pos"
+      command="hl_cmd_pos hl_cmd_vel hl_cmd_eff" tdlo="hl_foot_force" />
+      
+    <lf auto_inst="qr_control::RobotLeg" jnt="hr" position="hr_pos"
+      command="hr_cmd_pos hr_cmd_vel hr_cmd_eff" tdlo="hr_foot_force" />
   </robot>
 
 </control>
