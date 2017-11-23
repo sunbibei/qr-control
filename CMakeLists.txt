@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(qr_control)
+project(qr_next_control)
 
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
@@ -19,7 +19,7 @@ find_package(orocos_kdl REQUIRED)
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES qr_control_lib
+  LIBRARIES ${PROJECT_NAME}_lib
   CATKIN_DEPENDS kdl_parser
   DEPENDS system_lib glog orocos_kdl
 )
@@ -37,10 +37,10 @@ set(DDP_FILES
   src/math.cpp
   src/gesture_control.cpp)
   
-add_library(qr_control_lib ${DDP_FILES} )
+add_library(${PROJECT_NAME}_lib ${DDP_FILES} )
 
 
- target_link_libraries(qr_control_lib
+ target_link_libraries(${PROJECT_NAME}_lib
   ${catkin_LIBRARIES}
   ${orocos_kdl_LIBRARIES}
   ${kdl_parser_LIBRARIES}
