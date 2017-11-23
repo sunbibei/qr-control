@@ -5,7 +5,6 @@
 #include "qr_control/ultility.h"
 #include <iostream>
 
-
 enum ContactStatus {None=0, Deep};
 
 
