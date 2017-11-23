@@ -6,23 +6,22 @@ add_definitions(-std=c++11)
 find_package(catkin REQUIRED
   COMPONENTS
   cmake_modules
-  urdf
+  # urdf
   qr_driver
-  kdl_parser
 )
 
 find_package(Boost REQUIRED COMPONENTS thread)
-find_package(orocos_kdl REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 catkin_package(
   INCLUDE_DIRS include
 
   LIBRARIES ${PROJECT_NAME}_lib
-  CATKIN_DEPENDS kdl_parser qr_driver
-  DEPENDS system_lib glog orocos_kdl
+  CATKIN_DEPENDS qr_driver
+  DEPENDS
 )
 
-include_directories(include ${catkin_INCLUDE_DIRS})
+include_directories(include ${EIGEN3_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
 
 set(SRC_ROOT          src)
 set(SRC_GAITS_ROOT    ${SRC_ROOT}/gait)
@@ -37,6 +36,8 @@ set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
 set(ROBOT_FILES       ${SRC_ORIGIN_ROOT}/origin.cpp
                       ${SRC_ORIGIN_ROOT}/origin_test.cpp
 
+                      ${SRC_ROBOT_ROOT}/data_leg.cpp
+                      ${SRC_ROBOT_ROOT}/math_leg.cpp
                       ${SRC_ROBOT_ROOT}/robot_leg.cpp
                       ${SRC_ROBOT_ROOT}/robot_body.cpp
 )
@@ -79,9 +80,7 @@ set(DDP_FILES
   
 add_library(${PROJECT_NAME}_lib ${DDP_FILES} )
 
-
-<<<<<<< HEAD
- target_link_libraries(${PROJECT_NAME}_lib
+target_link_libraries(${PROJECT_NAME}_lib
   ${catkin_LIBRARIES}
   ${orocos_kdl_LIBRARIES}
   ${kdl_parser_LIBRARIES}
