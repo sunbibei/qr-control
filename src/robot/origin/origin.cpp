@@ -29,4 +29,22 @@ Origin::~Origin() {
   ;
 }
 
+bool Origin::registerResource(const MiiString& _n, DataTypeFrom _handle) {
+  if (data_origin_.end() != data_origin_.find(_n)) {
+    LOG_WARNING << "The named resource '" << _n << "' has registered in the resource table."
+        << ", now it will be replaced.";
+  }
+
+  data_origin_[_n] = _handle;
+}
+
+bool Origin::registerCommand(const MiiString& _n, DataTypeTo _handle) {
+  if (cmd_origin_.end() != cmd_origin_.find(_n)) {
+    LOG_WARNING << "The named command '" << _n << "' has registered in the command table."
+        << ", now it will be replaced.";
+  }
+  
+  cmd_origin_[_n] = _handle;
+}
+
 } /* namespace qr_control */

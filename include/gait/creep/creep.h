@@ -43,6 +43,7 @@ protected:
   StateMachine<CreepState>* state_machine_;
 
 private:
+  ///! Example
   void init_pose();
   void cali_imu();
   void stance();

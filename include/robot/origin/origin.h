@@ -14,6 +14,13 @@
 
 namespace qr_control {
 
+#define REG_RESOURCE(_n, _var) ( Origin::instance()->registerResource(_n, _var) )
+#define REG_COMMAND (_n, _var) ( Origin::instance()->registerCommand (_n, _var) )
+
+#define GET_RESOURCE(_n, _type)  ( Origin::instance()->resource<##_type>(_n) )
+#define GET_COMMAND (_n, _type)  ( Origin::instance()->command<##_type> (_n) )
+
+
 typedef boost::variant<const short*, const int*, const double*,
     const Eigen::VectorXi*, const Eigen::MatrixXi*,
     const Eigen::VectorXd*, const Eigen::MatrixXd*> DataTypeFrom;
@@ -30,6 +37,8 @@ public:
   _DataType get(const MiiString&);
 
 private:*/
+  bool registerResource(const MiiString&, DataTypeFrom);
+  bool registerCommand(const MiiString&, DataTypeTo);
   ///! The boost static assert fail! so we need split into two methods.
   template<typename _DataType>
   _DataType resource(const MiiString&);
