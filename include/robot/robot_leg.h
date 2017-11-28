@@ -8,6 +8,7 @@
 #ifndef INCLUDE_ROBOT_ROBOT_LEG_H_
 #define INCLUDE_ROBOT_ROBOT_LEG_H_
 
+#include <adt/trajectory.h>
 #include <robot/math_leg.h>
 
 namespace qr_control {
@@ -25,7 +26,6 @@ public:
 
 ///! The status of robot-leg of getter
 public:
-  void jointPosition(Eigen::Vector3d& _p);
   void eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy);
   void eef(Eigen::Vector3d& _xyz);
   void eef(Eigen::Quaterniond& _rpy);
@@ -38,33 +38,38 @@ public:
   ///! setter target methods
   void jointTarget           (const JntTarget&);
   void jointTarget           (JntType, JntCmdType, double);
-  void jointTrajectoryTarget (const class Trajectory&);
+  void jointTrajectoryTarget (JntType, const Trajectory1d&);
+  ///! The default order is knee, hip and yaw
+  void jointTrajectoryTarget (const Trajectory3d&);
   void eefOrientationTarget  (const Eigen::Quaterniond&);
   void eefPositionTarget     (const Eigen::Vector3d&);
-  void eefTrajectoryTarget   (const class Trajectory&);
+  void eefTrajectoryTarget   (const Trajectory3d&);
 
   ///! getter target methods
   const JntTarget&          jointTarget           ();
-  const class Trajectory&   jointTrajectoryTarget ();
+  const Trajectory1d&       jointTrajectoryTarget ();
   const Eigen::Quaterniond& eefOrientationTarget  ();
   const Eigen::Vector3d&    eefPositionTarget     ();
-  const class Trajectory&   eefTrajectoryTarget   ();
+  const Trajectory3d&       eefTrajectoryTarget   ();
 
 ///! These are the helper methods
 protected:
-  virtual void followJntTrajectory(const class Trajectory*) = 0;
-  virtual void followEefTrajectory(const class Trajectory*) = 0;
+  virtual void followJntTrajectory(JntType, const Trajectory1d) = 0;
+  virtual void followJntTrajectory(const Trajectory3d) = 0;
+  virtual void followEefTrajectory(const Trajectory3d) = 0;
 
   virtual void execut(const JntTarget&);
   virtual void execut(const Eigen::Quaterniond&);
   virtual void execut(const Eigen::Vector3d&);
 
+///! The targets for each spaces.
 protected:
-  class Trajectory*  jnt_traj_target_;
+  Trajectory1d       jnt_traj_target_;
+  Trajectory3d       jnts_traj_target_;
   JntTarget          jnt_target_;
   Eigen::Vector3d    eef_xyz_target_;
   Eigen::Quaterniond eef_rpy_target_;
-  class Trajectory*  eef_traj_target_;
+  Trajectory3d       eef_traj_target_;
 
 private:
   enum TargetType {
@@ -78,6 +83,7 @@ private:
   };
 
   TargetType curr_target_;
+  JntType    curr_target_jnt_;
 };
 
 } /* namespace qr_control */

@@ -8,7 +8,7 @@
 #ifndef INCLUDE_GAIT_GAIT_BASE_H_
 #define INCLUDE_GAIT_GAIT_BASE_H_
 
-#include <system/foundation/label.h>
+#include <foundation/label.h>
 
 namespace qr_control {
 

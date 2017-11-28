@@ -8,7 +8,7 @@
 #ifndef INCLUDE_ROBOT_ORIGIN_H_
 #define INCLUDE_ROBOT_ORIGIN_H_
 
-#include <system/foundation/label.h>
+#include <foundation/label.h>
 #include <boost/variant.hpp>
 #include <Eigen/Dense>
 

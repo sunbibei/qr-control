@@ -6,7 +6,7 @@
  */
 
 #include <robot/data_leg.h>
-#include <system/foundation/cfg_reader.h>
+#include <foundation/cfg_reader.h>
 
 namespace qr_control {
 
@@ -42,5 +42,20 @@ bool DataLeg::init() {
 DataLeg::~DataLeg() {
   ; // Nothing to do here
 }
+
+inline JntType DataLeg::joint_type() { return jnt_type_; }
+
+inline short         DataLeg::foot_force()               { return *foot_force_; }
+inline const short&  DataLeg::foot_force_const_ref()     { return *foot_force_; }
+inline const short*  DataLeg::foot_force_const_pointer() { return foot_force_;  }
+
+inline Eigen::VectorXd        DataLeg::joint_position()               { return *jnt_pos_; }
+inline const Eigen::VectorXd& DataLeg::joint_position_const_ref()     { return *jnt_pos_; }
+inline const Eigen::VectorXd* DataLeg::joint_position_const_pointer() { return jnt_pos_;  }
+
+// Only get the last command.
+inline Eigen::VectorXd        DataLeg::joint_command(JntCmdType _t)         { return *(jnt_cmd_[_t]); }
+inline Eigen::VectorXd&       DataLeg::joint_command_ref(JntCmdType _t)     { return *(jnt_cmd_[_t]); }
+inline Eigen::VectorXd*       DataLeg::joint_command_pointer(JntCmdType _t) { return jnt_cmd_[_t];    }
 
 } /* namespace qr_control */

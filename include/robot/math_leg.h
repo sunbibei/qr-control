@@ -8,7 +8,7 @@
 #ifndef INCLUDE_ROBOT_MATH_LEG_H_
 #define INCLUDE_ROBOT_MATH_LEG_H_
 
-#include <system/foundation/label.h>
+#include <foundation/label.h>
 #include "data_leg.h"
 
 namespace qr_control {

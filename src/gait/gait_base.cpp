@@ -7,7 +7,7 @@
 
 #include <gait/gait_base.h>
 #include <gait/gait_manager.h>
-#include <system/foundation/cfg_reader.h>
+#include <foundation/cfg_reader.h>
 
 
 namespace qr_control {

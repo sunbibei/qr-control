@@ -27,6 +27,7 @@ set(SRC_ROOT          src)
 set(SRC_GAITS_ROOT    ${SRC_ROOT}/gait)
 set(SRC_ROBOT_ROOT    ${SRC_ROOT}/robot)
 set(SRC_ORIGIN_ROOT   ${SRC_ROBOT_ROOT}/origin)
+set(SRC_ADT_ROOT      ${SRC_ROOT}/adt)
 
 set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
                       ${SRC_GAITS_ROOT}/gait_base.cpp

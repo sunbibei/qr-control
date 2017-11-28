@@ -8,7 +8,7 @@
 #ifndef INCLUDE_ROBOT_ROBOT_BODY_H_
 #define INCLUDE_ROBOT_ROBOT_BODY_H_
 
-#include <system/foundation/label.h>
+#include <foundation/label.h>
 #include <Eigen/Dense>
 
 namespace qr_control {

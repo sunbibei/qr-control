@@ -8,7 +8,8 @@
 #ifndef INCLUDE_ROBOT_DATA_LEG_H_
 #define INCLUDE_ROBOT_DATA_LEG_H_
 
-#include <system/foundation/label.h>
+#include <foundation/label.h>
+
 #include "origin/origin.h"
 
 namespace qr_control {
@@ -18,6 +19,22 @@ public:
   DataLeg();
   virtual bool init() override;
   virtual ~DataLeg();
+
+public:
+  JntType joint_type();
+
+  short         foot_force();
+  const short&  foot_force_const_ref();
+  const short*  foot_force_const_pointer();
+
+  Eigen::VectorXd        joint_position();
+  const Eigen::VectorXd& joint_position_const_ref();
+  const Eigen::VectorXd* joint_position_const_pointer();
+
+  // Only get the last command.
+  Eigen::VectorXd        joint_command(JntCmdType);
+  Eigen::VectorXd&       joint_command_ref(JntCmdType);
+  Eigen::VectorXd*       joint_command_pointer(JntCmdType);
 
 protected:
   ///! The type of this leg, reference to utf.h

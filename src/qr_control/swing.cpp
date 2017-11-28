@@ -125,3 +125,4 @@ _Position Swing::get_eclipse_pos(_Position Start_point, _Position End_point, int
   }
   return p;
 }
+

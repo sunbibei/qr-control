@@ -6,7 +6,7 @@
  */
 
 #include <gait/creep/creep.h>
-#include <system/foundation/cfg_reader.h>
+#include <foundation/cfg_reader.h>
 
 
 namespace qr_control {

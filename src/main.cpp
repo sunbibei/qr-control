@@ -7,8 +7,8 @@
 #include <iostream>
 #include <ros/ros.h>
 #include "gait/gait_manager.h"
-#include <system/foundation/cfg_reader.h>
-#include <system/foundation/auto_instanceor.h>
+#include <foundation/cfg_reader.h>
+#include <foundation/auto_instanceor.h>
 
 #include <Eigen/Dense>
 

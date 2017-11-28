@@ -14,20 +14,11 @@ namespace qr_control {
 
 RobotLeg::RobotLeg()
   : MathLeg(),
-    jnt_traj_target_(nullptr), eef_traj_target_(nullptr),
     curr_target_(TargetType::INVALID_TARGET) {
-  ;
+  curr_target_jnt_ = JntType::UNKNOWN_JNT;
 }
 
 RobotLeg::~RobotLeg() {
-  if (jnt_traj_target_) {
-    delete jnt_traj_target_;
-    jnt_traj_target_ = nullptr;
-  }
-  if (eef_traj_target_) {
-    delete eef_traj_target_;
-    eef_traj_target_ = nullptr;
-  }
 }
 
 /*void RobotLeg::asyncMove(bool& ret_ref) {
@@ -40,7 +31,11 @@ void RobotLeg::move() {
     execut(jnt_target_);
     break;
   case TargetType::JNT_TRAJ:
-    followJntTrajectory(jnt_traj_target_);
+    // Using the N_JNTS represent the all of joints.
+    if (JntType::N_JNTS != curr_target_jnt_)
+      followJntTrajectory(curr_target_jnt_, jnt_traj_target_);
+    else
+      followJntTrajectory(jnts_traj_target_);
     break;
   case TargetType::EEF_XYZ:
     execut(eef_xyz_target_);
@@ -50,7 +45,7 @@ void RobotLeg::move() {
     execut(eef_rpy_target_);
     break;
   case TargetType::EEF_TRAJ:
-    followJntTrajectory(eef_traj_target_);
+    followEefTrajectory(eef_traj_target_);
     break;
   default:
     break;
@@ -90,8 +85,16 @@ void RobotLeg::jointTarget(JntType jnt_type, JntCmdType jnt_cmd_type, double tar
   curr_target_             = TargetType::JNT_CMD;
 }
 
-void RobotLeg::jointTrajectoryTarget(const Trajectory&) {
+void RobotLeg::jointTrajectoryTarget(JntType _t, const Trajectory1d& _traj) {
   // TODO
+  curr_target_jnt_ = _t;
+  jnt_traj_target_ = _traj;
+}
+
+void RobotLeg::jointTrajectoryTarget(const Trajectory3d& _traj) {
+  // TODO
+  curr_target_jnt_ = JntType::N_JNTS;
+  jnts_traj_target_ = _traj;
 }
 
 void RobotLeg::eefOrientationTarget(const Eigen::Quaterniond& t) {
@@ -103,7 +106,8 @@ void RobotLeg::eefPositionTarget(const Eigen::Vector3d& t) {
   eef_xyz_target_ = t;
   curr_target_    = TargetType::EEF_XYZ;
 }
-void RobotLeg::eefTrajectoryTarget(const Trajectory& t) {
+
+void RobotLeg::eefTrajectoryTarget(const Trajectory3d& t) {
   // TODO
 }
 
@@ -112,23 +116,20 @@ const JntTarget& RobotLeg::jointTarget() {
   return jnt_target_;
 }
 
-const Trajectory&   RobotLeg::jointTrajectoryTarget() {
-  return *jnt_traj_target_;
+const Trajectory1d&   RobotLeg::jointTrajectoryTarget() {
+  return jnt_traj_target_;
 }
 
 const Eigen::Quaterniond& RobotLeg::eefOrientationTarget() {
   return eef_rpy_target_;
 }
 
-const Eigen::Vector3d&    RobotLeg::eefPositionTarget   () {
+const Eigen::Vector3d&    RobotLeg::eefPositionTarget() {
   return eef_xyz_target_;
 }
-const Trajectory&   RobotLeg::eefTrajectoryTarget       () {
-  return *eef_traj_target_;
-}
 
-void RobotLeg::jointPosition(Eigen::Vector3d& _p) {
-  _p = *jnt_pos_;
+const Trajectory3d&   RobotLeg::eefTrajectoryTarget() {
+  return eef_traj_target_;
 }
 
 void RobotLeg::eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy) {
