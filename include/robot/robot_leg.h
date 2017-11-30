@@ -15,7 +15,7 @@ namespace qr_control {
 
 struct JntTarget {
   JntType    jnt_type;
-  JntCmdType jnt_cmd_type;
+  JntDataType jnt_cmd_type;
   double     target;
 };
 
@@ -37,7 +37,7 @@ public:
 public:
   ///! setter target methods
   void jointTarget           (const JntTarget&);
-  void jointTarget           (JntType, JntCmdType, double);
+  void jointTarget           (JntType, JntDataType, double);
   void jointTrajectoryTarget (JntType, const Trajectory1d&);
   ///! The default order is knee, hip and yaw
   void jointTrajectoryTarget (const Trajectory3d&);

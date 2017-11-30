@@ -15,18 +15,20 @@ find_package(Eigen3 REQUIRED)
 
 catkin_package(
   INCLUDE_DIRS include
-
-  LIBRARIES ${PROJECT_NAME}_lib
+  LIBRARIES
   CATKIN_DEPENDS qr_driver
   DEPENDS
 )
 
-include_directories(include ${EIGEN3_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
+include_directories(
+  include
+  ${EIGEN3_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS}
+)
 
 set(SRC_ROOT          src)
 set(SRC_GAITS_ROOT    ${SRC_ROOT}/gait)
 set(SRC_ROBOT_ROOT    ${SRC_ROOT}/robot)
-set(SRC_ORIGIN_ROOT   ${SRC_ROBOT_ROOT}/origin)
 set(SRC_ADT_ROOT      ${SRC_ROOT}/adt)
 
 set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
@@ -34,10 +36,7 @@ set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
                       ${SRC_GAITS_ROOT}/creep/creep.cpp
 )
 
-set(ROBOT_FILES       ${SRC_ORIGIN_ROOT}/origin.cpp
-                      ${SRC_ORIGIN_ROOT}/origin_test.cpp
-
-                      ${SRC_ROBOT_ROOT}/data_leg.cpp
+set(ROBOT_FILES       ${SRC_ROBOT_ROOT}/data_leg.cpp
                       ${SRC_ROBOT_ROOT}/math_leg.cpp
                       ${SRC_ROBOT_ROOT}/robot_leg.cpp
                       ${SRC_ROBOT_ROOT}/robot_body.cpp
@@ -53,9 +52,9 @@ add_library(${PROJECT_NAME}_repository
 )
 
 ## Declare a C++ executable
-add_executable(${PROJECT_NAME}_test
+#[[add_executable(${PROJECT_NAME}_test
   ${BIN_FILES}
-)
+)]]
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_repository
@@ -63,27 +62,9 @@ target_link_libraries(${PROJECT_NAME}_repository
   ${orocos_kdl_LIBRARIES}
   ${kdl_parser_LIBRARIES}
   qr_driver_foundation
+  qr_driver_registry
 )
 
-target_link_libraries(${PROJECT_NAME}_test
+#[[target_link_libraries(${PROJECT_NAME}_test
   ${PROJECT_NAME}_repository
-)
-
-
-
-
-set(DDP_FILES
-  src/qr_control/position_joint_group_controller.cpp
-  src/qr_control/foot_contact.cpp
-  src/qr_control/swing.cpp
-  src/qr_control/math.cpp
-  src/qr_control/gesture_control.cpp)
-  
-add_library(${PROJECT_NAME}_lib ${DDP_FILES} )
-
-target_link_libraries(${PROJECT_NAME}_lib
-  ${catkin_LIBRARIES}
-  ${orocos_kdl_LIBRARIES}
-  ${kdl_parser_LIBRARIES}
-  glog
-)
+)]]

@@ -6,9 +6,11 @@
  */
 
 #include <robot/math_leg.h>
+/*
 #include "robot/origin/origin.h"
 
 #include <foundation/cfg_reader.h>
+*/
 
 namespace qr_control {
 

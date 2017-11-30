@@ -53,22 +53,24 @@ void RobotLeg::move() {
 }
 
 void RobotLeg::execut(const JntTarget& t) {
-  (*jnt_cmd_[t.jnt_cmd_type])[t.jnt_type] = t.target;
+  if (JntDataType::POS != t.jnt_cmd_type) {
+    LOG_ERROR << "Only Support Position Mode!";
+    joint_command_ref()(t.jnt_type) = t.target;
+  }
 }
 
 void RobotLeg::execut(const Eigen::Quaterniond& t) {
   Eigen::Vector3d _jnt_cmd;
   inverse_kinematics(t, _jnt_cmd);
   for (int i = 0; i < _jnt_cmd.size(); ++i)
-    (*jnt_cmd_[JntCmdType::POS])[i] = _jnt_cmd[i];
-
+    joint_command_ref()(i) = _jnt_cmd[i];
 }
 
 void RobotLeg::execut(const Eigen::Vector3d& t) {
   Eigen::Vector3d _jnt_cmd;
   inverse_kinematics(t, _jnt_cmd);
   for (int i = 0; i < _jnt_cmd.size(); ++i)
-    (*jnt_cmd_[JntCmdType::POS])[i] = _jnt_cmd[i];
+    joint_command_ref()(i) = _jnt_cmd[i];
 
 }
 
@@ -78,7 +80,7 @@ void RobotLeg::jointTarget(const JntTarget& t) {
   curr_target_ = TargetType::JNT_CMD;
 }
 
-void RobotLeg::jointTarget(JntType jnt_type, JntCmdType jnt_cmd_type, double target) {
+void RobotLeg::jointTarget(JntType jnt_type, JntDataType jnt_cmd_type, double target) {
   jnt_target_.jnt_cmd_type = jnt_cmd_type;
   jnt_target_.jnt_type     = jnt_type;
   jnt_target_.target       = target;
