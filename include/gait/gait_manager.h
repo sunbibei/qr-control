@@ -21,11 +21,6 @@ class GaitManager
 
 public:
   /*!
-   * Complete initialization.
-   */
-  bool init();
-
-  /*!
    * The main function what call the active gait to control robot.
    */
   void tick();
@@ -34,6 +29,9 @@ public:
    * Change the active gait.
    */
   void activate(const MiiString& gait_name);
+
+  virtual void add(GaitBase*) override;
+
 protected:
   GaitBase*                     running_gait_;
   GaitBase*                     active_gait_;

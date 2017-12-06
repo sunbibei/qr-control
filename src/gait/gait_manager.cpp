@@ -21,12 +21,10 @@ GaitManager::~GaitManager() {
   // Nothing to do here.
 }
 
-bool GaitManager::init() {
-  for (auto gait : res_list_) {
-    gait_list_by_name_.insert(std::make_pair(gait->gaitName(), gait));
-  }
+void GaitManager::add(GaitBase* gait) {
+  middleware::internal::ResourceManager<GaitBase>::add(gait);
 
-  return true;
+  gait_list_by_name_.insert(std::make_pair(gait->gaitName(), gait));
 }
 
 void GaitManager::tick() {

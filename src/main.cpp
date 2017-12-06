@@ -33,7 +33,7 @@ void create_system_instance() {
   // All of the objects mark with "auto_inst" in the configure file
   // will be instanced here.
   LOG_DEBUG << "Now, We are ready to auto_inst object in the configure file.";
-  cfg->registerCallbackAndExcute("auto_inst", __auto_inst);
+  cfg->regAttrCb("auto_inst", __auto_inst);
   // Just for debug
   LOG_DEBUG << "Auto instance has finished. The results list as follow:";
   Label::printfEveryInstance();
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
 
   create_system_instance();
 
-  if (!_manager || !_manager->init()) {
+  if (!_manager) {
     LOG_ERROR << "Something is wrong!";
     return -1;
   }
