@@ -67,16 +67,6 @@ bool MiiControl::init() {
   return true;
 }
 
-bool MiiControl::start() {
-  //  TODO
-  // middleware::ThreadPool::instance()->add(MII_CTRL, &MiiControl::tick, this);
-  return true;
-}
-
-void MiiControl::halt() {
-  ; // Nothing to do here.
-}
-
 void MiiControl::activate(const MiiString& _n) {
   GaitManager::instance()->activate(_n);
 }

@@ -25,11 +25,7 @@ public:
   /*!
    * @brief Starting to work
    */
-  virtual bool start();
-  /*!
-   * @brief halt
-   */
-  virtual void halt();
+  virtual void tick();
 
   /*!
    * @brief Switch to the different gait mode. This action is sync, the method
@@ -43,8 +39,6 @@ protected:
    * @brief The all of singleton has created.
    */
   virtual void create_system_instance();
-
-  virtual void tick();
 
 protected:
   MiiString prefix_tag_;
