@@ -148,4 +148,58 @@ void RobotLeg::eef(Eigen::Quaterniond& _rpy) {
   forward_kinematics(_xyz, _rpy);
 }
 
+void RobotLeg::followJntTrajectory(JntType, const Trajectory1d) {
+  LOG_ERROR << "Call the 'followJntTrajectory' which has does not complemented.";
+}
+
+void RobotLeg::followJntTrajectory(const Trajectory3d) {
+  LOG_ERROR << "Call the 'followJntTrajectory' which has does not complemented.";
+}
+
+void RobotLeg::followEefTrajectory(const Trajectory3d) {
+  LOG_ERROR << "Call the 'followJntTrajectory' which has does not complemented.";
+}
+
+LegState RobotLeg::leg_state() {
+  LOG_ERROR << "Call the 'leg_state' which has does not complemented.";
+  return LegState::INVALID_STATE;
+}
+/*!
+ * @brief The forward kinematic solution for the foot link.
+ * @param translation [out]  The current translation from the base frame.
+ * @param quaternion  [out]  The current quaternion related to the base frame.
+ */
+void RobotLeg::forward_kinematics(
+    Eigen::Vector3d& translation, Eigen::Quaterniond& quaternion) {
+  LOG_ERROR << "Call the 'forward_kinematics' which has does not complemented.";
+}
+/*!
+ * @brief The inverse kinematic solution, given the target of foot pose.
+ * @param translation [in]  The target of the translation from the base frame.
+ * @param quaternion  [in]  The target of the quaternion related to the base frame.
+ * @param jnt_pos     [out] The result of joint position.
+ * @return Return true, if everything is OK, or return false.
+ */
+bool RobotLeg::inverse_kinematics(
+    const Eigen::Vector3d& translation, const Eigen::Quaterniond& quaternion,
+    Eigen::Vector3d& jnt_pos) {
+  LOG_ERROR << "Call the 'inverse_kinematics' which has does not complemented.";
+  return false;
+}
+
+bool RobotLeg::inverse_kinematics(
+      const Eigen::Vector3d& translation,   Eigen::Vector3d& jnt_pos) {
+  LOG_ERROR << "Call the 'inverse_kinematics' which has does not complemented.";
+  return false;
+}
+
+bool RobotLeg::inverse_kinematics(
+      const Eigen::Quaterniond& quaternion, Eigen::Vector3d& jnt_pos) {
+  LOG_ERROR << "Call the 'inverse_kinematics' which has does not complemented.";
+  return false;
+}
+
 } /* namespace qr_control */
+
+#include <class_loader/class_loader_register_macro.h>
+CLASS_LOADER_REGISTER_CLASS(qr_control::RobotLeg, Label)

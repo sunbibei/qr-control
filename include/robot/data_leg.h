@@ -20,7 +20,7 @@ public:
   virtual ~DataLeg();
 
 public:
-  JntType joint_type();
+  LegType leg_type();
 
   double         foot_force();
   const double&  foot_force_const_ref();
@@ -45,7 +45,7 @@ public:
 
 protected:
   ///! The type of this leg, reference to utf.h
-  JntType                jnt_type_;
+  LegType                leg_type_;
   ///! The data of the foot's force sensor.
   const double*          foot_force_;
   ///! The vector of joint position which size is 3.

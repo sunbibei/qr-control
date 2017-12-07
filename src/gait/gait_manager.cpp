@@ -6,6 +6,7 @@
  */
 
 #include <gait/gait_manager.h>
+#include <foundation/cfg_reader.h>
 
 namespace qr_control {
 
@@ -21,10 +22,18 @@ GaitManager::~GaitManager() {
   // Nothing to do here.
 }
 
-void GaitManager::add(GaitBase* gait) {
+/*void GaitManager::add(GaitBase* gait) {
   middleware::internal::ResourceManager<GaitBase>::add(gait);
 
   gait_list_by_name_.insert(std::make_pair(gait->gaitName(), gait));
+}*/
+
+bool GaitManager::init() {
+  for (const auto& g : res_list_) {
+    gait_list_by_name_.insert(std::make_pair(g->gaitName(), g));
+  }
+
+  return true;
 }
 
 void GaitManager::tick() {
@@ -55,6 +64,20 @@ void GaitManager::activate(const MiiString& gait_name) {
 
   LOG_INFO << "Switch the current gait to " << gait_name;
   active_gait_ = new_gait->second;
+}
+
+void GaitManager::print() {
+  if (_DEBUG_INFO_FLAG) {
+    LOG_WARNING << "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+";
+    LOG_WARNING << "\tNAME\t\tLABEL\t\tADDR";
+    for (auto hw : res_list_) {
+      LOG_INFO << hw->gait_name_ << "\t" << hw->getLabel() << "\t" << hw;
+    }
+    LOG_WARNING << "-------------------------------------------------------------";
+    LOG_WARNING << "The current running gait: " << running_gait_;
+    LOG_WARNING << "The current active  gait: " << active_gait_;
+    LOG_WARNING << "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+";
+  }
 }
 
 } /* namespace qr_control */

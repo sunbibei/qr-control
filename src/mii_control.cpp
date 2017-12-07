@@ -17,7 +17,7 @@
 
 namespace qr_control {
 
-#define MII_CTRL ("mii-control")
+// #define MII_CTRL ("mii-control")
 
 SINGLETON_IMPL_NO_CREATE(MiiControl)
 
@@ -41,7 +41,8 @@ MiiControl::MiiControl(const MiiString& _prefix)
 }
 
 MiiControl::~MiiControl() {
-
+  alive_ = false; // exit the thread
+  GaitManager::instance()->destroy_instance();
 }
 
 bool MiiControl::init() {
@@ -64,6 +65,13 @@ bool MiiControl::init() {
   LOG_DEBUG << "Auto instance has finished. The results list as follow:";
   Label::printfEveryInstance();
 
+  GaitManager::instance()->init();
+
+  MiiString act_gait;
+   if (cfg->get_value(Label::make_label(prefix_tag_, "gait"), "activate", act_gait))
+     activate(act_gait);
+
+  GaitManager::instance()->print();
   return true;
 }
 
@@ -79,9 +87,9 @@ void MiiControl::create_system_instance() {
 void MiiControl::tick() {
   TIMER_INIT
 
-  auto manager = GaitManager::instance();
   while (alive_) {
-    manager->tick();
+    if (GaitManager::instance()) GaitManager::instance()->tick();
+    else break;
 
     TIMER_CONTROL(tick_interval_)
   }

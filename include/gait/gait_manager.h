@@ -21,6 +21,10 @@ class GaitManager
 
 public:
   /*!
+   * @brief Initialization
+   */
+  bool init();
+  /*!
    * The main function what call the active gait to control robot.
    */
   void tick();
@@ -30,12 +34,17 @@ public:
    */
   void activate(const MiiString& gait_name);
 
-  virtual void add(GaitBase*) override;
+  // virtual void add(GaitBase*) override;
+
+  // for Debug
+  void print();
 
 protected:
   GaitBase*                     running_gait_;
   GaitBase*                     active_gait_;
   MiiMap<MiiString, GaitBase*>  gait_list_by_name_;
+
+  MiiString                     prefix_tag_;
 };
 
 } /* namespace qr_control */

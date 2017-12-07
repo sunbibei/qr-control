@@ -52,11 +52,11 @@ bool Creep::init() {
   state_machine_->registerStateCallback(
       CreepState::STATE_STANCE,   &Creep::stance,    this);
   state_machine_->registerStateCallback(
-      CreepState::STATE_HEIGHT,   &Creep::height,    this, current_state_);
+      CreepState::STATE_HEIGHT,   &Creep::height,    this, &current_state_);
   state_machine_->registerStateCallback(
-      CreepState::STATE_SWING,    &Creep::swing,     this, loop_count_);
+      CreepState::STATE_SWING,    &Creep::swing,     this, &loop_count_);
   state_machine_->registerStateCallback(
-      CreepState::STATE_HEIGHT2,  &Creep::height,    this, CreepState::STATE_HEIGHT2);
+      CreepState::STATE_HEIGHT2,  &Creep::height,    this, nullptr);
 
 
   current_state_ = CreepState::STATE_INIT_POS;
@@ -147,25 +147,32 @@ StateMachineBase* Creep::state_machine() {
 }
 
 void Creep::init_pose() {
-  LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__;
+  LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__
+      << ", STATE: STATE_INIT_POS";
 }
 
 void Creep::cali_imu() {
-  LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__;
+  LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__
+      << ", STATE: STATE_IMU";
 }
 
 void Creep::stance() {
-  LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__;
+  LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__
+      << ", STATE: STATE_STANCE";
 }
 
-void Creep::height(const CreepState& state) {
+void Creep::height(const CreepState* ps) {
+  CreepState state = CreepState::STATE_HEIGHT2;
+  if (ps) state = *ps;
   LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__
+      << ", STATE: STATE_HEIGHT"
       << ", and the current state: " << state;
 }
 
-void Creep::swing(size_t time_count) {
+void Creep::swing(const size_t* time_count) {
   LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__
-      << ", and the current time count: " << time_count;
+      << ", STATE: STATE_SWING"
+      << ", and the current time count: " << *time_count;
 }
 
 

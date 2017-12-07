@@ -13,7 +13,7 @@
 namespace qr_control {
 
 DataLeg::DataLeg()
-  : Label("robot-leg"), jnt_type_(JntType::UNKNOWN_JNT),
+  : Label("robot-leg"), leg_type_(LegType::UNKNOWN_LEG),
     foot_force_(nullptr), jnt_cmd_(nullptr) {
   for (auto& c : jnt_pos_)
     c = nullptr;
@@ -21,7 +21,7 @@ DataLeg::DataLeg()
 
 bool DataLeg::init() {
   auto cfg    = MiiCfgReader::instance();
-  cfg->get_value_fatal(getLabel(), "jnt", jnt_type_);
+  cfg->get_value_fatal(getLabel(), "leg", leg_type_);
 
   MiiString tmp_str;
   cfg->get_value_fatal(getLabel(), "command", tmp_str);
@@ -32,10 +32,9 @@ bool DataLeg::init() {
 
   ///! The 'command' attribute should be has three elements.
   MiiVector<MiiString> tmp_vec;
-  cfg->get_value_fatal(getLabel(), "position", tmp_vec);
-  for (size_t i = 0; i < tmp_vec.size() && i < 3; ++i) {
+  cfg->get_value_fatal(getLabel(), "resource", tmp_vec);
+  for (size_t i = 0; i < tmp_vec.size() && i < 3; ++i)
     jnt_pos_[i] = GET_RESOURCE(tmp_vec[i], const Eigen::VectorXd*);
-  }
 
   return true;
 }
@@ -44,7 +43,7 @@ DataLeg::~DataLeg() {
   ; // Nothing to do here
 }
 
-JntType DataLeg::joint_type() { return jnt_type_; }
+LegType DataLeg::leg_type() { return leg_type_; }
 
 double         DataLeg::foot_force()               { return *foot_force_; }
 const double&  DataLeg::foot_force_const_ref()     { return *foot_force_; }

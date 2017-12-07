@@ -47,8 +47,8 @@ private:
   void init_pose();
   void cali_imu();
   void stance();
-  void height(const CreepState& state);
-  void swing(size_t time_count);
+  void height(const CreepState* state);
+  void swing(const size_t* time_count);
 
 private:
   class __PrivateParam* params_;
