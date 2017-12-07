@@ -5,16 +5,16 @@
  *      Author: bibei
  */
 
-#ifndef INCLUDE_ROBOT_MATH_LEG_H_
-#define INCLUDE_ROBOT_MATH_LEG_H_
+#ifndef INCLUDE_ROBOT_LEG_MATH_LEG_H_
+#define INCLUDE_ROBOT_LEG_MATH_LEG_H_
 
 #include <foundation/label.h>
-#include "data_leg.h"
+#include <robot/leg/data_leg.h>
 
 namespace qr_control {
 
 enum LegState {
-  INVALID_STATE = -1,
+  INVALID_LEG_STATE = -1,
   TD_STATE,
   AIR_STATE,
   N_LEG_STATE
@@ -52,4 +52,4 @@ public:
 
 } /* namespace qr_control */
 
-#endif /* INCLUDE_ROBOT_MATH_LEG_H_ */
+#endif /* INCLUDE_ROBOT_LEG_MATH_LEG_H_ */

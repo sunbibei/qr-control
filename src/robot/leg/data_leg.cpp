@@ -5,9 +5,8 @@
  *      Author: bibei
  */
 
-#include <robot/data_leg.h>
-
 #include <foundation/cfg_reader.h>
+#include <robot/leg/data_leg.h>
 #include "repository/registry.h"
 
 namespace qr_control {

@@ -5,7 +5,7 @@
  *      Author: bibei
  */
 
-#include <robot/math_leg.h>
+#include <robot/leg/math_leg.h>
 /*
 #include "robot/origin/origin.h"
 

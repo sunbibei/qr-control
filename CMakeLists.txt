@@ -28,7 +28,10 @@ include_directories(
 
 set(SRC_ROOT          src)
 set(SRC_GAITS_ROOT    ${SRC_ROOT}/gait)
+
 set(SRC_ROBOT_ROOT    ${SRC_ROOT}/robot)
+set(SRC_RO_LEG_ROOT   ${SRC_ROBOT_ROOT}/leg)
+
 set(SRC_ADT_ROOT      ${SRC_ROOT}/adt)
 
 set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
@@ -36,9 +39,10 @@ set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
                       ${SRC_GAITS_ROOT}/creep/creep.cpp
 )
 
-set(ROBOT_FILES       ${SRC_ROBOT_ROOT}/data_leg.cpp
-                      ${SRC_ROBOT_ROOT}/math_leg.cpp
-                      ${SRC_ROBOT_ROOT}/robot_leg.cpp
+set(ROBOT_FILES       ${SRC_RO_LEG_ROOT}/data_leg.cpp
+                      ${SRC_RO_LEG_ROOT}/math_leg.cpp
+                      ${SRC_RO_LEG_ROOT}/robot_leg.cpp
+                      ${SRC_RO_LEG_ROOT}/qr_leg.cpp
                       ${SRC_ROBOT_ROOT}/robot_body.cpp
 )
 

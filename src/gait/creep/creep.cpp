@@ -7,7 +7,7 @@
 
 #include <gait/creep/creep.h>
 #include <foundation/cfg_reader.h>
-
+#include <robot/leg/qr_leg.h>
 
 namespace qr_control {
 
@@ -32,19 +32,19 @@ struct __PrivateParam {
 };
 
 Creep::Creep(const MiiString& _n)
-  : GaitBase(_n), current_state_(CreepState::INVALID_STATE),
+  : GaitBase(_n), current_state_(CreepState::INVALID_CREEP_STATE),
     state_machine_(nullptr), params_(nullptr),
     loop_count_(0), leg_order_(LegType::UNKNOWN_LEG) {
-  ;
+  for (auto& l : leg_ifaces_)
+    l = nullptr;
 }
 
 bool Creep::init() {
   if (!GaitBase::init()) return false;
   // auto cfg = MiiCfgReader::instance();
-  params_ = new __PrivateParam(getLabel());
+  params_        = new __PrivateParam(getLabel());
 
   state_machine_ = new StateMachine<CreepState>(current_state_);
-
   state_machine_->registerStateCallback(
       CreepState::STATE_INIT_POS, &Creep::init_pose, this);
   state_machine_->registerStateCallback(
@@ -57,9 +57,25 @@ bool Creep::init() {
       CreepState::STATE_SWING,    &Creep::swing,     this, &loop_count_);
   state_machine_->registerStateCallback(
       CreepState::STATE_HEIGHT2,  &Creep::height,    this, nullptr);
-
-
   current_state_ = CreepState::STATE_INIT_POS;
+
+  int count      = 0;
+  LegType leg    = LegType::UNKNOWN_LEG;
+  auto cfg       = MiiCfgReader::instance();
+  MiiString _tag = Label::make_label(getLabel(), "interface_" + std::to_string(count));
+  while (cfg->get_value(_tag, "leg", leg)) {
+    MiiString label;
+    cfg->get_value_fatal(_tag, "label", label);
+    auto iface = Label::getHardwareByName<QrLeg>(label);
+    if (nullptr == iface) {
+      LOG_FATAL << "No such named '" << label << "' interface of leg.";
+    } else {
+      leg_ifaces_[leg] = iface;
+    }
+
+    _tag = Label::make_label(getLabel(), "interface_" + std::to_string(++count));
+  }
+
   return true;
 }
 
@@ -149,6 +165,10 @@ StateMachineBase* Creep::state_machine() {
 void Creep::init_pose() {
   LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__
       << ", STATE: STATE_INIT_POS";
+  for (const auto& leg : leg_ifaces_) {
+    LOG_INFO << leg->leg_type() << " -- "
+        << leg->joint_position().transpose() << ", "<< leg->joint_velocity().transpose();
+  }
 }
 
 void Creep::cali_imu() {
@@ -159,6 +179,10 @@ void Creep::cali_imu() {
 void Creep::stance() {
   LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__
       << ", STATE: STATE_STANCE";
+  for (const auto& leg : leg_ifaces_) {
+    LOG_INFO << leg->leg_type() << " -- "
+        << leg->joint_position().transpose() << ", "<< leg->joint_velocity().transpose();
+  }
 }
 
 void Creep::height(const CreepState* ps) {
@@ -173,6 +197,10 @@ void Creep::swing(const size_t* time_count) {
   LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__
       << ", STATE: STATE_SWING"
       << ", and the current time count: " << *time_count;
+  for (const auto& leg : leg_ifaces_) {
+    LOG_INFO << leg->leg_type() << " -- "
+        << leg->joint_position().transpose() << ", "<< leg->joint_velocity().transpose();
+  }
 }
 
 

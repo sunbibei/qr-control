@@ -5,8 +5,8 @@
  *      Author: bibei
  */
 
-#ifndef INCLUDE_ROBOT_DATA_LEG_H_
-#define INCLUDE_ROBOT_DATA_LEG_H_
+#ifndef INCLUDE_ROBOT_LEG_DATA_LEG_H_
+#define INCLUDE_ROBOT_LEG_DATA_LEG_H_
 
 #include <foundation/label.h>
 #include <Eigen/Dense>
@@ -56,4 +56,4 @@ protected:
 
 } /* namespace qr_control */
 
-#endif /* INCLUDE_ROBOT_DATA_LEG_H_ */
+#endif /* INCLUDE_ROBOT_LEG_DATA_LEG_H_ */

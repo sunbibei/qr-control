@@ -13,7 +13,7 @@
 namespace qr_control {
 
 enum CreepState {
-  INVALID_STATE = -1,
+  INVALID_CREEP_STATE = -1,
   STATE_INIT_POS,
   STATE_IMU,
   STATE_STANCE,
@@ -55,6 +55,7 @@ private:
   size_t                loop_count_;
   LegType               leg_order_;
 
+  class QrLeg*          leg_ifaces_[LegType::N_LEGS];
 
 };
 
