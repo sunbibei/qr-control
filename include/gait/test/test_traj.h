@@ -54,6 +54,7 @@ private:
   void spec_code();
 
 private:
+  int                   last_choice_;
   size_t                loop_count_;
   LegType               leg_order_;
 

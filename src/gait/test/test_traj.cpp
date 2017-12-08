@@ -22,8 +22,8 @@ namespace qr_control {
 
 TestTraj::TestTraj(const MiiString& _n)
   : GaitBase(_n), current_state_(TestTrajState::INVALID_TEST_STATE),
-    state_machine_(nullptr), loop_count_(0),
-    leg_order_(LegType::UNKNOWN_LEG) {
+    state_machine_(nullptr), last_choice_(TestTrajState::STATE_INIT),
+    loop_count_(0), leg_order_(LegType::UNKNOWN_LEG) {
   for (auto& l : leg_ifaces_)
     l = nullptr;
 }
@@ -140,7 +140,11 @@ JntDataType __get_jnt_data_type(const MiiString& _val) {
   }
 }
 
+bool s_is_first = true;
 void TestTraj::initialize() {
+  // if (s_is_first) sleep(1);
+  // s_is_first = false;
+  sleep(1);
   int choice = -1;
   std::string str;
   bool valid = false;
@@ -154,22 +158,24 @@ void TestTraj::initialize() {
   std::cout << "3. read  the last command of joints(no implement);" << std::endl;
   std::cout << "4. execute the trajectory of joints(no implement);" << std::endl;
   std::cout << "5. execute the trajectory of eef(no implement);"    << std::endl;
-  std::cout << "Input your choice,  or 'ctrl + c' to shutdown: \033[0m";
+  std::cout << "\n\nInput your choice,  or 'ctrl + c' to shutdown: \033[0m";
   INPUT_UNTIL_ENTER(str)
-  choice = atoi(str.c_str());
+  choice = (str.empty()) ? (last_choice_) : (atoi(str.c_str()));
   valid = (((choice > INVALID_TEST_STATE)
       && (choice < N_TEST_TRAJ_STATE)) || (SPEC_CODE == choice));
   while (!valid) {
     std::cout << "\033[32;1mWrong! Input again, or 'ctrl + c' to shutdown: \033[0m";
     std::cin >> str;
-    choice = atoi(str.c_str());
-    valid = ((choice > INVALID_TEST_STATE) && (choice < N_TEST_TRAJ_STATE));
+    choice = (str.empty()) ? (last_choice_) : (atoi(str.c_str()));
+    valid  = ((choice > INVALID_TEST_STATE) && (choice < N_TEST_TRAJ_STATE));
   }
   std::cout << "\033[32;1m--------------------------------------------------\033[0m" << std::endl;
   if (SPEC_CODE == choice)
     spec_code();
   else
     current_state_ = (TestTrajState)choice;
+
+  last_choice_ = choice;
 }
 
 void TestTraj::print() {
@@ -181,14 +187,14 @@ void TestTraj::print() {
   std::cout << "arg1: additional argument, a internal number" << std::endl;
   std::cout << "arg2: additional argument, a double number, period between each print" << std::endl;
   std::cout << "e.g." << std::endl;
-  std::cout << "print pos fl 100 \033[35;1m// it will print the position of leg 'fl'.\033[0m" << std::endl;
-  std::cout << "print pos all\033[35;1m// it will print the position of the all of leg.\033[0m " << std::endl;
+  std::cout << "print fl pos 100 \033[35;1m// it will print the position of leg 'fl'.\033[0m" << std::endl;
+  std::cout << "print all pos \033[35;1m// it will print the position of the all of leg.\033[0m " << std::endl;
 
   bool valid = false;
   bool first = true;
   do {
-    if (first) std::cout << "\033[33;1mInput your choice,  or 'ctrl + c' to shutdown: \033[0m";
-    else std::cout << "\033[33;1mWrong! Input again, or 'ctrl + c' to shutdown: \033[0m";
+    if (first) std::cout << "\n\n\033[33;1mInput your choice,  or 'ctrl + c' to shutdown: \033[0m";
+    else std::cout << "\n\n\033[33;1mWrong! Input again, or 'ctrl + c' to shutdown: \033[0m";
     first = false;
 
     std::string str;
@@ -310,14 +316,14 @@ void TestTraj::command() {
   std::cout << "type:  pos, vel, tor" << std::endl;
   std::cout << "value: a float value" << std::endl;
   std::cout << "e.g." << std::endl;
-  std::cout << "set pos fl yaw 0.3 \033[35;1m// it will send the position command 0.3 to the joint 'yaw' of leg 'fl'.\033[0m" << std::endl;
+  std::cout << "set fl yaw pos 0.3 \033[35;1m// it will send the position command 0.3 to the joint 'yaw' of leg 'fl'.\033[0m" << std::endl;
 
   std::string str;
   bool valid = false;
   bool first = true;
   do {
-    if (first) std::cout << "\033[33;1mInput your choice,  or 'ctrl + c' to shutdown: \033[0m";
-    else std::cout << "\033[33;1mWrong! Input again, or 'ctrl + c' to shutdown: \033[0m";
+    if (first) std::cout << "\n\n\033[33;1mInput your choice,  or 'ctrl + c' to shutdown: \033[0m";
+    else std::cout << "\n\n\033[33;1mWrong! Input again, or 'ctrl + c' to shutdown: \033[0m";
     first = false;
 
     std::string str;
