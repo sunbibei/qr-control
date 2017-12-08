@@ -37,6 +37,7 @@ set(SRC_ADT_ROOT      ${SRC_ROOT}/adt)
 set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
                       ${SRC_GAITS_ROOT}/gait_base.cpp
                       ${SRC_GAITS_ROOT}/creep/creep.cpp
+                      ${SRC_GAITS_ROOT}/test/test_traj.cpp
 )
 
 set(ROBOT_FILES       ${SRC_RO_LEG_ROOT}/data_leg.cpp

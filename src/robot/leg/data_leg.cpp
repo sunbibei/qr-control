@@ -38,9 +38,13 @@ bool DataLeg::init() {
   cfg->get_value_fatal(getLabel(), "tor", tmp_str);
   jnt_pos_[JntDataType::TOR] = GET_RESOURCE(tmp_str, const EVX*);
 
-  LOG_INFO << "get resource(JntDataType::POS/" << leg_type_ << "): " << jnt_pos_[JntDataType::POS];
-  LOG_INFO << "get resource(JntDataType::VEL/" << leg_type_ << "): " << jnt_pos_[JntDataType::VEL];
-  LOG_INFO << "get resource(JntDataType::TOR/" << leg_type_ << "): " << jnt_pos_[JntDataType::TOR];
+  if (_DEBUG_INFO_FLAG) {
+    LOG_INFO << "get command (" << leg_type_ << "): " << jnt_cmd_;
+    LOG_INFO << "get resource(JntDataType::TD /" << leg_type_ << "): " << foot_force_;
+    LOG_INFO << "get resource(JntDataType::POS/" << leg_type_ << "): " << jnt_pos_[JntDataType::POS];
+    LOG_INFO << "get resource(JntDataType::VEL/" << leg_type_ << "): " << jnt_pos_[JntDataType::VEL];
+    LOG_INFO << "get resource(JntDataType::TOR/" << leg_type_ << "): " << jnt_pos_[JntDataType::TOR];
+  }
   return true;
 }
 
