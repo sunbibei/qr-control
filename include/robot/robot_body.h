@@ -9,7 +9,10 @@
 #define INCLUDE_ROBOT_ROBOT_BODY_H_
 
 #include <foundation/label.h>
+#include <foundation/utf.h>
 #include <Eigen/Dense>
+
+#define G 9.80665
 
 namespace qr_control {
 
@@ -19,22 +22,35 @@ public:
   virtual ~RobotBody() { };
 
 public:
-  /*!
-   * @brief Calculate the current position of the center of the main body.
-   * @param translation [out] The translation from the base frame.
-   * @param quaternion  [out] The quaternion related to the base frame.
-   */
-  virtual void cog(Eigen::Vector3d& translation) = 0;
-  /*!
-   * @brief Calculate the current rotation of the main body.
-   * @param quaternion  [out] The quaternion representing the rotation from the base frame.
-   */
-  virtual void rotation(Eigen::Quaterniond& quaternion) = 0;
-  /*!
-   * @brief Calculate the current velocity of the center of the main body.
-   * @param v [out] The current velocity under the base frame.
-   */
-  virtual void velocity(Eigen::Vector3d& v) = 0;
+  
+  void cogCal(EV3& translation);
+ 
+  void rotation(Eigen::Quaterniond& quaternion);
+  
+  void velocity(EV3& v);
+
+  void calZmpPos();
+  void setExecuteDuration(const double& duration);
+  void setCogThreshold(const double& threshold);
+
+  EV3 calCogPos(const EV3& dist, const int& t);
+  EV3 calCogVel(const EV3& dist, const int& t);
+
+private:
+
+  EV3 calInnerHeart(const EV3& A, const EV3& B, const EV3& C);
+
+  EV3 calLineSection(const EV3& A, const EV3& B, float ratio);  
+
+  EV3 calCrossPoint(const EV3& P1, const EV3& P2, const EV3& P3, const EV3& P4);
+
+  bool calInnerTriangle(const EV3& A, const EV3& B, const EV3& C, EM3& Triangle);
+
+  float calInscribedCircleRadius(const EV3& A, const EV3& B, const EV3& C);
+
+private:
+  EV3 body_cog_, body_vel_, body_acc, body_zmp_;
+  float cog_threshold_, duration_;
 };
 
 } /* namespace qr_control */

@@ -24,19 +24,19 @@ bool DataLeg::init() {
 
   MiiString tmp_str;
   cfg->get_value_fatal(getLabel(), "command", tmp_str);
-  jnt_cmd_ = GET_COMMAND(tmp_str, Eigen::VectorXd*);
+  jnt_cmd_ = GET_COMMAND(tmp_str, EVX*);
 
   cfg->get_value_fatal(getLabel(), "tdlo", tmp_str);
   foot_force_  = GET_RESOURCE(tmp_str, const double*);
 
   cfg->get_value_fatal(getLabel(), "pos", tmp_str);
-  jnt_pos_[JntDataType::POS] = GET_RESOURCE(tmp_str, const Eigen::VectorXd*);
+  jnt_pos_[JntDataType::POS] = GET_RESOURCE(tmp_str, const EVX*);
 
   cfg->get_value_fatal(getLabel(), "vel", tmp_str);
-  jnt_pos_[JntDataType::VEL] = GET_RESOURCE(tmp_str, const Eigen::VectorXd*);
+  jnt_pos_[JntDataType::VEL] = GET_RESOURCE(tmp_str, const EVX*);
 
   cfg->get_value_fatal(getLabel(), "tor", tmp_str);
-  jnt_pos_[JntDataType::TOR] = GET_RESOURCE(tmp_str, const Eigen::VectorXd*);
+  jnt_pos_[JntDataType::TOR] = GET_RESOURCE(tmp_str, const EVX*);
 
   LOG_INFO << "get resource(JntDataType::POS/" << leg_type_ << "): " << jnt_pos_[JntDataType::POS];
   LOG_INFO << "get resource(JntDataType::VEL/" << leg_type_ << "): " << jnt_pos_[JntDataType::VEL];
@@ -54,21 +54,21 @@ double         DataLeg::foot_force()               { return *foot_force_; }
 const double&  DataLeg::foot_force_const_ref()     { return *foot_force_; }
 const double*  DataLeg::foot_force_const_pointer() { return foot_force_;  }
 
-Eigen::VectorXd        DataLeg::joint_position()               { return *jnt_pos_[JntDataType::POS]; }
-const Eigen::VectorXd& DataLeg::joint_position_const_ref()     { return *jnt_pos_[JntDataType::POS]; }
-const Eigen::VectorXd* DataLeg::joint_position_const_pointer() { return jnt_pos_[JntDataType::POS];  }
+EVX        DataLeg::joint_position()               { return *jnt_pos_[JntDataType::POS]; }
+const EVX& DataLeg::joint_position_const_ref()     { return *jnt_pos_[JntDataType::POS]; }
+const EVX* DataLeg::joint_position_const_pointer() { return jnt_pos_[JntDataType::POS];  }
 
-Eigen::VectorXd        DataLeg::joint_velocity()               { return *jnt_pos_[JntDataType::VEL]; }
-const Eigen::VectorXd& DataLeg::joint_velocity_const_ref()     { return *jnt_pos_[JntDataType::VEL]; }
-const Eigen::VectorXd* DataLeg::joint_velocity_const_pointer() { return jnt_pos_[JntDataType::VEL];  }
+EVX        DataLeg::joint_velocity()               { return *jnt_pos_[JntDataType::VEL]; }
+const EVX& DataLeg::joint_velocity_const_ref()     { return *jnt_pos_[JntDataType::VEL]; }
+const EVX* DataLeg::joint_velocity_const_pointer() { return jnt_pos_[JntDataType::VEL];  }
 
-Eigen::VectorXd        DataLeg::joint_torque()               { return *jnt_pos_[JntDataType::TOR]; }
-const Eigen::VectorXd& DataLeg::joint_torque_const_ref()     { return *jnt_pos_[JntDataType::TOR]; }
-const Eigen::VectorXd* DataLeg::joint_torque_const_pointer() { return jnt_pos_[JntDataType::TOR];  }
+EVX        DataLeg::joint_torque()               { return *jnt_pos_[JntDataType::TOR]; }
+const EVX& DataLeg::joint_torque_const_ref()     { return *jnt_pos_[JntDataType::TOR]; }
+const EVX* DataLeg::joint_torque_const_pointer() { return jnt_pos_[JntDataType::TOR];  }
 
 // Only get the last command.
-Eigen::VectorXd        DataLeg::joint_command()         { return *jnt_cmd_; }
-Eigen::VectorXd&       DataLeg::joint_command_ref()     { return *jnt_cmd_; }
-Eigen::VectorXd*       DataLeg::joint_command_pointer() { return jnt_cmd_;  }
+EVX        DataLeg::joint_command()         { return *jnt_cmd_; }
+EVX&       DataLeg::joint_command_ref()     { return *jnt_cmd_; }
+EVX*       DataLeg::joint_command_pointer() { return jnt_cmd_;  }
 
 } /* namespace qr_control */

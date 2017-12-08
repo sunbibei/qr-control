@@ -9,6 +9,7 @@
 #define INCLUDE_ROBOT_LEG_DATA_LEG_H_
 
 #include <foundation/label.h>
+#include <foundation/utf.h>
 #include <Eigen/Dense>
 
 namespace qr_control {
@@ -26,22 +27,22 @@ public:
   const double&  foot_force_const_ref();
   const double*  foot_force_const_pointer();
 
-  Eigen::VectorXd        joint_position();
-  const Eigen::VectorXd& joint_position_const_ref();
-  const Eigen::VectorXd* joint_position_const_pointer();
+  EVX        joint_position();
+  const EVX& joint_position_const_ref();
+  const EVX* joint_position_const_pointer();
 
-  Eigen::VectorXd        joint_velocity();
-  const Eigen::VectorXd& joint_velocity_const_ref();
-  const Eigen::VectorXd* joint_velocity_const_pointer();
+  EVX        joint_velocity();
+  const EVX& joint_velocity_const_ref();
+  const EVX* joint_velocity_const_pointer();
 
-  Eigen::VectorXd        joint_torque();
-  const Eigen::VectorXd& joint_torque_const_ref();
-  const Eigen::VectorXd* joint_torque_const_pointer();
+  EVX        joint_torque();
+  const EVX& joint_torque_const_ref();
+  const EVX* joint_torque_const_pointer();
 
   // Only get the last command.
-  Eigen::VectorXd        joint_command();
-  Eigen::VectorXd&       joint_command_ref();
-  Eigen::VectorXd*       joint_command_pointer();
+  EVX        joint_command();
+  EVX&       joint_command_ref();
+  EVX*       joint_command_pointer();
 
 protected:
   ///! The type of this leg, reference to utf.h
@@ -49,9 +50,9 @@ protected:
   ///! The data of the foot's force sensor.
   const double*          foot_force_;
   ///! The vector of joint position which size is 3.
-  const Eigen::VectorXd* jnt_pos_[JntDataType::N_JNT_DATA_TYPES];
+  const EVX* jnt_pos_[JntDataType::N_JNT_DATA_TYPES];
   ///! The vector of joint command.
-  Eigen::VectorXd*       jnt_cmd_;
+  EVX*       jnt_cmd_;
 };
 
 } /* namespace qr_control */

@@ -39,10 +39,6 @@ void RobotLeg::move() {
     break;
   case TargetType::EEF_XYZ:
     execut(eef_xyz_target_);
-    // inverse_kinematics();
-    break;
-  case TargetType::EEF_RPY:
-    execut(eef_rpy_target_);
     break;
   case TargetType::EEF_TRAJ:
     followEefTrajectory(eef_traj_target_);
@@ -52,26 +48,18 @@ void RobotLeg::move() {
   }
 }
 
-void RobotLeg::execut(const JntTarget& t) {
-  if (JntDataType::POS != t.jnt_cmd_type) {
+void RobotLeg::execut(const JntTarget& p) {
+  if (JntDataType::POS != p.jnt_cmd_type) {
     LOG_ERROR << "Only Support Position Mode!";
-    joint_command_ref()(t.jnt_type) = t.target;
+    joint_command_ref()(p.jnt_type) = p.target;
   }
 }
 
-void RobotLeg::execut(const Eigen::Quaterniond& t) {
-  Eigen::Vector3d _jnt_cmd;
-  inverse_kinematics(t, _jnt_cmd);
-  for (int i = 0; i < _jnt_cmd.size(); ++i)
+void RobotLeg::execut(const EVX& p) {
+  EVX _jnt_cmd;
+  inverseKinematics(p, _jnt_cmd);
+  for (int i = 0; i < N_JNTS; ++i)
     joint_command_ref()(i) = _jnt_cmd[i];
-}
-
-void RobotLeg::execut(const Eigen::Vector3d& t) {
-  Eigen::Vector3d _jnt_cmd;
-  inverse_kinematics(t, _jnt_cmd);
-  for (int i = 0; i < _jnt_cmd.size(); ++i)
-    joint_command_ref()(i) = _jnt_cmd[i];
-
 }
 
 ///! setter methods
@@ -104,7 +92,7 @@ void RobotLeg::eefOrientationTarget(const Eigen::Quaterniond& t) {
   curr_target_    = TargetType::EEF_RPY;
 }
 
-void RobotLeg::eefPositionTarget(const Eigen::Vector3d& t) {
+void RobotLeg::eefPositionTarget(const EV3& t) {
   eef_xyz_target_ = t;
   curr_target_    = TargetType::EEF_XYZ;
 }
@@ -126,7 +114,7 @@ const Eigen::Quaterniond& RobotLeg::eefOrientationTarget() {
   return eef_rpy_target_;
 }
 
-const Eigen::Vector3d&    RobotLeg::eefPositionTarget() {
+const EV3&    RobotLeg::eefPositionTarget() {
   return eef_xyz_target_;
 }
 
@@ -134,18 +122,10 @@ const Trajectory3d&   RobotLeg::eefTrajectoryTarget() {
   return eef_traj_target_;
 }
 
-void RobotLeg::eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy) {
-  forward_kinematics(_xyz, _rpy);
-}
-
-void RobotLeg::eef(Eigen::Vector3d& _xyz) {
-  Eigen::Quaterniond _rpy;
-  forward_kinematics(_xyz, _rpy);
-}
-
-void RobotLeg::eef(Eigen::Quaterniond& _rpy) {
-  Eigen::Vector3d _xyz;
-  forward_kinematics(_xyz, _rpy);
+void RobotLeg:: eefOriPos(EVX& _rpy, EVX& _xyz)
+{
+  _rpy = joint_position();
+  forwardKinematics(_rpy, _xyz);
 }
 
 } /* namespace qr_control */

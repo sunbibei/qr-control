@@ -14,7 +14,7 @@
 namespace qr_control {
 
 enum LegState {
-  INVALID_LEG_STATE = -1,
+  INVALID_STATE = -1,
   TD_STATE,
   AIR_STATE,
   N_LEG_STATE
@@ -30,8 +30,7 @@ public:
    * @param translation [out]  The current translation from the base frame.
    * @param quaternion  [out]  The current quaternion related to the base frame.
    */
-  virtual void forward_kinematics(
-      Eigen::Vector3d& translation, Eigen::Quaterniond& quaternion) = 0;
+  virtual void forwardKinematics(const EVX& angle, EVX& jnt_pos) = 0;
   /*!
    * @brief The inverse kinematic solution, given the target of foot pose.
    * @param translation [in]  The target of the translation from the base frame.
@@ -39,13 +38,7 @@ public:
    * @param jnt_pos     [out] The result of joint position.
    * @return Return true, if everything is OK, or return false.
    */
-  virtual bool inverse_kinematics(
-      const Eigen::Vector3d& translation, const Eigen::Quaterniond& quaternion,
-      Eigen::Vector3d& jnt_pos) = 0;
-  virtual bool inverse_kinematics(
-        const Eigen::Vector3d& translation,   Eigen::Vector3d& jnt_pos) = 0;
-  virtual bool inverse_kinematics(
-        const Eigen::Quaterniond& quaternion, Eigen::Vector3d& jnt_pos) = 0;
+  virtual void inverseKinematics(const EVX& jnt_pos, EVX& angle) = 0; 
 
   // virtual void base_frame();
 };

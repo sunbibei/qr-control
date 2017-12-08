@@ -26,10 +26,8 @@ public:
 
 ///! The status of robot-leg of getter
 public:
-  void eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy);
-  void eef(Eigen::Vector3d& _xyz);
-  void eef(Eigen::Quaterniond& _rpy);
-
+  void eefOriPos(EVX& _rpy, EVX& _xyz);
+ 
 public:
   // virtual void asyncMove(bool& ret_ref);
   virtual void move();
@@ -42,14 +40,14 @@ public:
   ///! The default order is knee, hip and yaw
   void jointTrajectoryTarget (const Trajectory3d&);
   void eefOrientationTarget  (const Eigen::Quaterniond&);
-  void eefPositionTarget     (const Eigen::Vector3d&);
+  void eefPositionTarget     (const EV3&);
   void eefTrajectoryTarget   (const Trajectory3d&);
 
   ///! getter target methods
   const JntTarget&          jointTarget           ();
   const Trajectory1d&       jointTrajectoryTarget ();
   const Eigen::Quaterniond& eefOrientationTarget  ();
-  const Eigen::Vector3d&    eefPositionTarget     ();
+  const EV3&    eefPositionTarget     ();
   const Trajectory3d&       eefTrajectoryTarget   ();
 
 ///! These are the helper methods
@@ -59,15 +57,14 @@ protected:
   virtual void followEefTrajectory(const Trajectory3d) = 0;
 
   virtual void execut(const JntTarget&);
-  virtual void execut(const Eigen::Quaterniond&);
-  virtual void execut(const Eigen::Vector3d&);
+  virtual void execut(const EVX&);
 
 ///! The targets for each spaces.
 protected:
   Trajectory1d       jnt_traj_target_;
   Trajectory3d       jnts_traj_target_;
   JntTarget          jnt_target_;
-  Eigen::Vector3d    eef_xyz_target_;
+  EV3    eef_xyz_target_;
   Eigen::Quaterniond eef_rpy_target_;
   Trajectory3d       eef_traj_target_;
 
