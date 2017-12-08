@@ -24,8 +24,10 @@ protected:
   virtual void followEefTrajectory(const Trajectory3d) override;
 
 // inhert from MathLeg
-protected:
+public:
   virtual LegState leg_state() override;
+
+protected:
   /*!
    * @brief The forward kinematic solution for the foot link.
    * @param translation [out]  The current translation from the base frame.

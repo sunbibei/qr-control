@@ -22,4 +22,11 @@
       command="hr_cmd_pos hr_cmd_vel hr_cmd_eff" tdlo="hr_foot_force" />
   </robot>
 
+  <robot >
+    <mathleg auto_inst="qr_control::MathLeg" name = "mathleg">
+      <length description = "initilize the __PrivateParam"
+        yaw="4" hip="27.3" knee="22.5"  />  
+    </mathleg> 
+  </robot>
+
 </control>

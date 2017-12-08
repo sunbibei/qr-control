@@ -29,12 +29,18 @@ bool DataLeg::init() {
   cfg->get_value_fatal(getLabel(), "tdlo", tmp_str);
   foot_force_  = GET_RESOURCE(tmp_str, const double*);
 
-  ///! The 'command' attribute should be has three elements.
-  MiiVector<MiiString> tmp_vec;
-  cfg->get_value_fatal(getLabel(), "resource", tmp_vec);
-  for (size_t i = 0; i < tmp_vec.size() && i < 3; ++i)
-    jnt_pos_[i] = GET_RESOURCE(tmp_vec[i], const Eigen::VectorXd*);
+  cfg->get_value_fatal(getLabel(), "pos", tmp_str);
+  jnt_pos_[JntDataType::POS] = GET_RESOURCE(tmp_str, const Eigen::VectorXd*);
 
+  cfg->get_value_fatal(getLabel(), "vel", tmp_str);
+  jnt_pos_[JntDataType::VEL] = GET_RESOURCE(tmp_str, const Eigen::VectorXd*);
+
+  cfg->get_value_fatal(getLabel(), "tor", tmp_str);
+  jnt_pos_[JntDataType::TOR] = GET_RESOURCE(tmp_str, const Eigen::VectorXd*);
+
+  LOG_INFO << "get resource(JntDataType::POS/" << leg_type_ << "): " << jnt_pos_[JntDataType::POS];
+  LOG_INFO << "get resource(JntDataType::VEL/" << leg_type_ << "): " << jnt_pos_[JntDataType::VEL];
+  LOG_INFO << "get resource(JntDataType::TOR/" << leg_type_ << "): " << jnt_pos_[JntDataType::TOR];
   return true;
 }
 

@@ -76,6 +76,11 @@ bool Creep::init() {
     _tag = Label::make_label(getLabel(), "interface_" + std::to_string(++count));
   }
 
+  LOG_INFO << "get interface(LegType::FL): " << leg_ifaces_[LegType::FL];
+  LOG_INFO << "get interface(LegType::FR): " << leg_ifaces_[LegType::FR];
+  LOG_INFO << "get interface(LegType::HL): " << leg_ifaces_[LegType::HL];
+  LOG_INFO << "get interface(LegType::HR): " << leg_ifaces_[LegType::HR];
+
   return true;
 }
 
@@ -166,8 +171,10 @@ void Creep::init_pose() {
   LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__
       << ", STATE: STATE_INIT_POS";
   for (const auto& leg : leg_ifaces_) {
-    LOG_INFO << leg->leg_type() << " -- "
-        << leg->joint_position().transpose() << ", "<< leg->joint_velocity().transpose();
+    auto pos = leg->joint_position();
+    auto vel = leg->joint_velocity();
+    printf("%01d -- %+01.04f %+01.04f %+01.04f,  %+01.04f %+01.04f %+01.04f\n",
+      leg->leg_type(), pos(0), pos(1), pos(2), vel(0), vel(1), vel(2));
   }
 }
 
@@ -180,8 +187,10 @@ void Creep::stance() {
   LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__
       << ", STATE: STATE_STANCE";
   for (const auto& leg : leg_ifaces_) {
-    LOG_INFO << leg->leg_type() << " -- "
-        << leg->joint_position().transpose() << ", "<< leg->joint_velocity().transpose();
+    auto pos = leg->joint_position();
+    auto vel = leg->joint_velocity();
+    printf("%01d -- %+01.04f %+01.04f %+01.04f,  %+01.04f %+01.04f %+01.04f\n",
+      leg->leg_type(), pos(0), pos(1), pos(2), vel(0), vel(1), vel(2));
   }
 }
 
@@ -198,8 +207,10 @@ void Creep::swing(const size_t* time_count) {
       << ", STATE: STATE_SWING"
       << ", and the current time count: " << *time_count;
   for (const auto& leg : leg_ifaces_) {
-    LOG_INFO << leg->leg_type() << " -- "
-        << leg->joint_position().transpose() << ", "<< leg->joint_velocity().transpose();
+    auto pos = leg->joint_position();
+    auto vel = leg->joint_velocity();
+    printf("%01d -- %+01.04f %+01.04f %+01.04f,  %+01.04f %+01.04f %+01.04f\n",
+      leg->leg_type(), pos(0), pos(1), pos(2), vel(0), vel(1), vel(2));
   }
 }
 
