@@ -74,8 +74,8 @@ void GaitManager::print() {
       LOG_INFO << hw->gait_name_ << "\t" << hw->getLabel() << "\t" << hw;
     }
     LOG_WARNING << "-------------------------------------------------------------";
-    LOG_WARNING << "The current running gait: " << running_gait_;
-    LOG_WARNING << "The current active  gait: " << active_gait_;
+    LOG_INFO << "The current running gait: " << running_gait_;
+    LOG_INFO << "The current active  gait: " << active_gait_;
     LOG_WARNING << "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+";
   }
 }
