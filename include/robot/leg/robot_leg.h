@@ -14,9 +14,9 @@
 namespace qr_control {
 
 struct JntTarget {
-  JntType    jnt_type;
+  JntType     jnt_type;
   JntDataType jnt_cmd_type;
-  double     target;
+  double      target;
 };
 
 class RobotLeg: public MathLeg {
@@ -64,7 +64,7 @@ protected:
   Trajectory1d       jnt_traj_target_;
   Trajectory3d       jnts_traj_target_;
   JntTarget          jnt_target_;
-  EV3    eef_xyz_target_;
+  EV3                eef_xyz_target_;
   Eigen::Quaterniond eef_rpy_target_;
   Trajectory3d       eef_traj_target_;
 
