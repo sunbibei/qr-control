@@ -227,9 +227,9 @@ Formula:
 */
 void QrLeg::inverseKinematics(const EVX& jnt_pos, EVX& angle)
 {
-  int s = 1;  
+  int s = -1;  
   if ((LegType::HL == leg_type_) || (LegType::HR == leg_type_))
-    s = -1;
+    s = 1;
   double Delte = -jnt_pos(0);
   angle(0) = atan(-jnt_pos(1) / jnt_pos(2));
 
