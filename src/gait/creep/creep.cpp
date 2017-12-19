@@ -95,6 +95,7 @@ void Creep::checkState() {
   switch(current_state_)
   {
     case CreepState::STATE_INIT_POS:
+      for (int )
     if(loop_count_ >= params_->count_init_pose) {
       loop_count_ = 0;
       LOG_INFO << "Robot has been initialized! Please input 1 to continue:";

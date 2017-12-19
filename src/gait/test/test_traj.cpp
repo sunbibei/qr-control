@@ -377,6 +377,14 @@ void TestTraj::command() {
 }
 
 void TestTraj::traj() {
+  Trajectory1d _traj;
+  _traj << 1.5350,   -1.3112,   -0.3450,   -0.4617;
+  std::cout << _traj << std::endl;
+
+  leg_ifaces_[LegType::HL]->jointTrajectoryTarget(JntType::HIP, _traj);
+  leg_ifaces_[LegType::HL]->move();
+
+  current_state_ = TestTrajState::STATE_INIT;
 }
 
 void TestTraj::spec_code() {

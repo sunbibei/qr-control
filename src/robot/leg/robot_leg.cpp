@@ -79,12 +79,14 @@ void RobotLeg::jointTrajectoryTarget(JntType _t, const Trajectory1d& _traj) {
   // TODO
   curr_target_jnt_ = _t;
   jnt_traj_target_ = _traj;
+  curr_target_     = TargetType::JNT_TRAJ;
 }
 
 void RobotLeg::jointTrajectoryTarget(const Trajectory3d& _traj) {
   // TODO
-  curr_target_jnt_ = JntType::N_JNTS;
+  curr_target_jnt_  = JntType::N_JNTS;
   jnts_traj_target_ = _traj;
+  curr_target_      = TargetType::JNT_TRAJ;
 }
 
 void RobotLeg::eefOrientationTarget(const Eigen::Quaterniond& t) {

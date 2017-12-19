@@ -9,6 +9,7 @@
 #define INCLUDE_GAIT_CREEP_CREEP_H_
 
 #include <gait/gait_base.h>
+#include <Eigen/Dense>
 
 namespace qr_control {
 
@@ -57,6 +58,7 @@ private:
 
   class QrLeg*          leg_ifaces_[LegType::N_LEGS];
 
+  Eigen::VectorXd       init_pos_state_[LegType::N_LEGS];
 };
 
 } /* namespace qr_control */

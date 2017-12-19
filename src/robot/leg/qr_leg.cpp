@@ -7,6 +7,12 @@
  */
 
 #include <robot/leg/qr_leg.h>
+#include <foundation/cfg_reader.h>
+#include <foundation/auto_instanceor.h>
+
+#include <chrono>
+#include <thread>
+#include <iostream>
 
 namespace qr_control {
 // params list and parser from cfg
@@ -16,8 +22,7 @@ struct __PrivateParam
   size_t hip_len;
   size_t knee_len;  
 
-  __PrivateParam(const MiiString& _prefix) 
-  {
+  __PrivateParam(const MiiString& _prefix) {
     auto cfg = MiiCfgReader::instance();
     MiiString label = Label::make_label(_prefix, "length");
     cfg->get_value(label, "yaw", yaw_len);
@@ -38,13 +43,14 @@ QrLeg::~QrLeg()
   // TODO Auto-generated destructor stub
 }
 
-void QrLeg::followJntTrajectory(JntType, const Trajectory1d) 
-{
-  LOG_ERROR << "Call the 'followJntTrajectory' which has does not complemented.";
+void QrLeg::followJntTrajectory(JntType jnt, const Trajectory1d _traj)  {
+  for (int i = 0; i < 10; ++i) {
+    std::cout << i << ": " << this->joint_position_const_ref() << std::endl;
+    std::this_thread::sleep_for(std::chrono::seconds(4));
+  }
 }
 
-void QrLeg::followJntTrajectory(const Trajectory3d) 
-{
+void QrLeg::followJntTrajectory(const Trajectory3d) {
   LOG_ERROR << "Call the 'followJntTrajectory' which has does not complemented.";
 }
 

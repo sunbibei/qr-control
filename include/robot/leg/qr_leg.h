@@ -10,8 +10,6 @@
 #define INCLUDE_ROBOT_LEG_QR_LEG_H_
 
 #include <robot/leg/robot_leg.h>
-#include <foundation/cfg_reader.h>
-#include <foundation/auto_instanceor.h>
 
 namespace qr_control {
 
