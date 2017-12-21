@@ -48,6 +48,9 @@ void Gesture::updateImuData()
     Imu.yaw   = d[1]/57.3248 - Imu_const.yaw; // Y-axis
     Imu.roll  =-d[2]/57.3248 - Imu_const.roll; // Z-axis
   }
+  Imu.pitch = 0; // X-axis
+  Imu.yaw   = 0; // Y-axis
+  Imu.roll  = 0; // Z-axis
   for(int i=1;i<arr_size;i++)
   {
     imu_arr[i-1] = imu_arr[i];
@@ -113,6 +116,11 @@ _Position Gesture::getSingleShoulderPos(int legId)
     case RB:
     return S.rb;  
   } 
+}
+
+void Gesture::printImuAngle()
+{
+  std::cout<<"Gesture class: Imu angle:"<<Imu.pitch<<", "<<Imu.yaw<<", "<<Imu.roll<<std::endl;
 }
 
 

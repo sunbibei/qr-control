@@ -7,7 +7,7 @@ Swing::Swing()
 
 void Swing::init()
 {
-  verbose = true;
+  verbose = false;
 }
 
 /* 
@@ -45,25 +45,25 @@ compound Cycloid Velocity:
   p.z = 2 * H * (1/T - 1/4/PI*sin(4*PI*t/T));
   p.z = 2 * H * ((T-t)/T - 1/4/PI*sin(4*PI*(T-t)/T));
 */
-_Position Swing::compoundCycloidVelocity(_Position Start_point, _Position End_point, int Loop, int T, int H)
+EV3 Swing::compoundCycloidVelocity(_Position Start_point, _Position End_point, int Loop, int T, int H)
 {
-  _Position v = {0,0,0};
+  EV3 v ;
 
-  v.x = (End_point.x - Start_point.x) * (1.0/(float)T - 1.0/(float)T*cos(2.0*PI*Loop/T));  
-  v.y = (End_point.y - Start_point.y) * (1.0/(float)T - 1.0/(float)T*cos(2.0*PI*Loop/T));
+  v(0) = (End_point.x - Start_point.x) * (1.0/(float)T - 1.0/(float)T*cos(2.0*PI*Loop/T));  
+  v(1) = (End_point.y - Start_point.y) * (1.0/(float)T - 1.0/(float)T*cos(2.0*PI*Loop/T));
 
   if(Loop<=T/2)
   {
-    v.z = 2.0 * H * (1.0/(float)T - 1.0/(float)T*cos(4.0*PI*Loop/T));
+    v(2) = 2.0 * H * (1.0/(float)T - 1.0/(float)T*cos(4.0*PI*Loop/T));
   }
   else if(Loop<=T)
   {
-    v.z = 2.0 * H * (-1.0/(float)T + 1.0/(float)T*cos(4.0*PI*(T-Loop)/T));
+    v(2) = 2.0 * H * (-1.0/(float)T + 1.0/(float)T*cos(4.0*PI*(T-Loop)/T));
   }
 
   if(verbose)
   {
-    std::cout<<"Swing class:"<<v.x<<" "<<v.y<<" "<<v.z<<std::endl;
+    std::cout<<"Swing class:"<<v(0)<<" "<<v(1)<<" "<<v(2)<<std::endl;
   }
   return v;
 }
@@ -75,7 +75,7 @@ _Position Swing::get_rect_pos(_Position Start_point, _Position End_point, int Lo
   float a = (End_point.x - Start_point.x)/(float)T*3;
   float b = (End_point.y - Start_point.y)/(float)T*3;
   float c = (float)H/(float)T*3;
-  std::cout<<"Swing class:"<<p.x<<" "<<p.y<<" "<<p.z<<std::endl;
+  // std::cout<<"Swing class:"<<p.x<<" "<<p.y<<" "<<p.z<<std::endl;
 
   if(Loop<=T/3)
   {
@@ -125,4 +125,3 @@ _Position Swing::get_eclipse_pos(_Position Start_point, _Position End_point, int
   }
   return p;
 }
-

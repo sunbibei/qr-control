@@ -29,7 +29,16 @@ public:
   void eefOriPos(EVX& _rpy, EVX& _xyz);
  
 public:
-  // virtual void asyncMove(bool& ret_ref);
+  /*!
+   * @brief This method will be return immediately, the process of control is
+   *        running in a detach thread.
+   * @param remainder The remainder time in ms.
+   */
+  // virtual void asyncMove(size_t& ret_ref);
+  /*!
+   * @brief This method will be block until the process of control
+   *        has completed.
+   */
   virtual void move();
 
 public:

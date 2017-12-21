@@ -44,10 +44,22 @@ QrLeg::~QrLeg()
 }
 
 void QrLeg::followJntTrajectory(JntType jnt, const Trajectory1d _traj)  {
+  auto& _jnt_poss = joint_position_const_ref();
+  auto& _jnt_vels = joint_velocity_const_ref();
+  auto& _jnt_cmds = joint_command_ref();
+
+  // Just for debug
   for (int i = 0; i < 10; ++i) {
-    std::cout << i << ": " << this->joint_position_const_ref() << std::endl;
+    std::cout << i
+     << ": " << _jnt_poss(JntType::HIP)
+     << ", " << _jnt_poss(JntType::HIP)
+     << ", " << _jnt_poss(JntType::KNEE) << std::endl;
+
     std::this_thread::sleep_for(std::chrono::seconds(4));
   }
+
+
+
 }
 
 void QrLeg::followJntTrajectory(const Trajectory3d) {

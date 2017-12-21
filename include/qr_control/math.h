@@ -6,7 +6,6 @@
 #include "qr_control/ultility.h"
 #include <iostream>
 
-
 namespace qr_control {
 
   class Math {
@@ -25,7 +24,12 @@ namespace qr_control {
     _Angle_Leg cal_kinematics(const _Position &P,int Sgn);
     _Position cal_formula(const _Angle_Leg &A);
     float inscribedCircleRadius(const _Position &A, const _Position &B, const _Position &C);    
-    
+    bool getJacobMatrix(const EV3& a, EM3& JacobMatrix, EM3& inverseJacobMatrix);
+    EV3 jointVelToFoot(const EV3& joint_pos, const EV3& joint_vel);
+    EV3 footVelToJoint(const EV3& joint_pos, const EV3& foot_vel);
+    bool isJacobInvertible(const EV3& a);
+    float calPos(const EV3& dist, const int& t, const int& duration);
+
   };
 }
 #endif

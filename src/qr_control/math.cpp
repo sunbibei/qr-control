@@ -10,6 +10,59 @@ void Math::init()
   verbose = true;
 }
 
+bool Math::getJacobMatrix(const EV3& a, EM3& JacobMatrix, EM3& inverseJacobMatrix)
+{
+  bool invertible; 
+
+  JacobMatrix << 0, L1*cos(a(1)) + L2*cos(a(1)+a(2)), L2*cos(a(1)+a(2)),
+     L0*cos(a(0)) + L1*cos(a(0))*cos(a(1)) + L2*cos(a(0))*cos(a(1)+a(2)), 
+    -L1*sin(a(0))*sin(a(1)) - L2*sin(a(0))*sin(a(1)+a(2)),
+    -L2*sin(a(0))*sin(a(1)+a(2)),
+     L0*sin(a(0)) + L1*sin(a(0))*cos(a(1)) + L2*sin(a(0))*cos(a(1)+a(2)), 
+     L1*cos(a(0))*sin(a(1)) + L2*cos(a(0))*sin(a(1)+a(2)),
+     L2*cos(a(0))*sin(a(1)+a(2));           
+
+  JacobMatrix.computeInverseWithCheck(inverseJacobMatrix, invertible);
+
+  return invertible;
+}
+
+bool Math::isJacobInvertible(const EV3& a)
+{
+  bool invertible;
+  EM3 JacobMatrix, inverseJacobMatrix;
+  
+  JacobMatrix << 0, L1*cos(a(1)) + L2*cos(a(1)+a(2)), L2*cos(a(1)+a(2)),
+  L0*cos(a(0)) + L1*cos(a(0))*cos(a(1)) + L2*cos(a(0))*cos(a(1)+a(2)), 
+  -L1*sin(a(0))*sin(a(1)) - L2*sin(a(0))*sin(a(1)+a(2)),
+  -L2*sin(a(0))*sin(a(1)+a(2)),
+  L0*sin(a(0)) + L1*sin(a(0))*cos(a(1)) + L2*sin(a(0))*cos(a(1)+a(2)) + L2*cos(a(0))*sin(a(1)+a(2)), 
+  L1*cos(a(0))*sin(a(1)) + L2*cos(a(0))*sin(a(1)+a(2)),
+  L2*cos(a(0))*sin(a(1)+a(2));           
+
+  JacobMatrix.computeInverseWithCheck(inverseJacobMatrix, invertible);
+
+  return invertible;
+}
+
+EV3 Math::jointVelToFoot(const EV3& joint_pos, const EV3& joint_vel)
+{ 
+  EM3 JacobMatrix, inverseJacobMatrix;
+  bool invertible = getJacobMatrix(joint_pos, JacobMatrix, inverseJacobMatrix);
+  return JacobMatrix * joint_vel;
+}
+
+EV3 Math::footVelToJoint(const EV3& joint_pos, const EV3& foot_vel)
+{ 
+  EV3 result(-100000,-100000,-100000);
+  EM3 JacobMatrix, inverseJacobMatrix;
+  bool invertible = getJacobMatrix(joint_pos,JacobMatrix,inverseJacobMatrix);
+  if(invertible)
+  {
+    result = inverseJacobMatrix * foot_vel;
+  }  
+  return result; 
+}
 //三角形面积S=√[p(p-a)(p-b)(p-c)],其中p=(a+b+c)/2.(海伦公式)内切圆半径r=2S/(a+b+c)外接圆半径R=abc/4S
 float Math::inscribedCircleRadius(const _Position &A, const _Position &B, const _Position &C)
 {
@@ -77,6 +130,15 @@ _Position Math::formulaLineSection(const _Position &A, const _Position &B, float
   return result;
 }
 
+float Math::calPos(const EV3& dist, const int& t, const int& duration)
+{  
+  float result;
+  result = 6  * dist(0) * pow(t,5) / pow(duration,5);
+         - 15 * dist(0) * pow(t,4) / pow(duration,4);
+         + 10 * dist(0) * pow(t,3) / pow(duration,3);
+
+  return result;
+}
 _Position Math::getInnerHeart(const _Position &A, const _Position &B, const _Position &C)
 { 
   double a = 0, b = 0, c = 0;
@@ -89,7 +151,7 @@ _Position Math::getInnerHeart(const _Position &A, const _Position &B, const _Pos
   heart.x = (a * A.x + b * B.x + c * C.x ) / (a + b + c);
   heart.y = (a * A.y + b * B.y + c * C.y ) / (a + b + c);
 
-  std::cout<<"Math class: innerheart:"<<heart.x<<","<<heart.y<<std::endl;
+  // std::cout<<"Math class: innerheart:"<<heart.x<<","<<heart.y<<std::endl;
 
   return heart;
 }

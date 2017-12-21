@@ -5,26 +5,47 @@
 #include <string>
 #include <iostream>
 #include <cmath>
+#include <Eigen/Dense>
+#include <vector>
+
+#define EV2 Eigen::Vector2d
+#define EV3 Eigen::Vector3d
+#define EVX Eigen::VectorXd
+#define EM3 Eigen::Matrix3d
+#define EMX Eigen::MatrixXd
+
+
+
 static const  int Joint_Num = 12;
+static const  int Leg_Num = 4;
 static const float PI = 3.14159265;
 static const  int Foot_Steps = 10;
-static const  int Swing_Height =6;
+static const  int Swing_Height = 5;
 static const  int Stance_Height = 46;
 static const  int Init_Num = 20;
-static const  int Swing_Num  = 30;
-static const  int Update_Rate = 1000;
+static const  int Swing_Num  = 50;
+static const  int Update_Rate = 100;
 static const double L0 = 4;
 static const double L1 = 27.3;
 static const double L2 = 22.5;
 static const double Body_L = 27.65;
 static const double Body_W = 16.8;
 static const double Body_D = 10;
-static const int cogThreshold = 5;
-static int Stance_Num = 40;
-static bool lb_flag =true;
-static bool lf_flag =true;
-static bool rb_flag =true;
-static bool rf_flag =true;
+static const float cogThreshold = 6.5;
+static int Stance_Num = 50;
+static bool lb_flag = true;
+static bool lf_flag = true;
+static bool rb_flag = true;
+static bool rf_flag = true;
+
+static const float YAW_MAX = 0.4165;
+static const float YAW_MIN = -0.3295;
+
+static const float HIP_MAX = 0.8733;
+static const float HIP_MIN = -0.2629;
+
+static const float KNEE_MAX = 1.4137;
+static const float KNEE_MIN = 0.5952;
 
 // enum Leg{LF,RF,LB,RB};
 enum Leg{LF,RF,LB,RB};
@@ -47,6 +68,8 @@ struct Commands
 	double position_; // Last commanded position
 	double velocity_; // Last commanded velocity
 	bool has_velocity_; // false if no velocity command has been specified
+  Commands( double position=0, double velocity=0, bool has_velocity=true) 
+  : position_(position), velocity_(velocity), has_velocity_(has_velocity){} 
 };
 
 struct IMU

@@ -35,6 +35,7 @@ namespace qr_control {
     void imuCalibration();
     void updateShoulderPos();
     void shoulderPosControl();
+    void printImuAngle();
     Position getShoulderPos();
     _Position getSingleShoulderPos(int legId);
 

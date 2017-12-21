@@ -5,6 +5,7 @@
 #include "qr_control/ultility.h"
 #include <iostream>
 
+
 enum ContactStatus {None=0, Deep};
 
 
@@ -14,7 +15,6 @@ namespace qr_control {
 	private:
 
 	    /////////////////////////////////////////////////
-		int seq_size;
 		bool verbose_;
 		bool leg_on_ground;
 
@@ -23,53 +23,40 @@ namespace qr_control {
 		ContactStatus lb_contact_status;
 		ContactStatus rb_contact_status;
 
-		int lf_feature_one_threshold;
-		int rf_feature_one_threshold;
-		int lb_feature_one_threshold;
-		int rb_feature_one_threshold;
+		int lf_threshold_;
+		int rf_threshold_;
+		int lb_threshold_;
+		int rb_threshold_;	
 
-		int lf_feature_two_threshold;
-		int rf_feature_two_threshold;
-		int lb_feature_two_threshold;
-		int rb_feature_two_threshold;
+		float lf_foot_force_;		
+		float rf_foot_force_;	
+		float lb_foot_force_;	
+		float rb_foot_force_;	
 
-		int lf_feature_three_threshold;
-		int rf_feature_three_threshold;
-		int lb_feature_three_threshold;
-		int rb_feature_three_threshold;
-
-
-		int lf_foot_force_arr[100];
-		int rf_foot_force_arr[100];
-		int lb_foot_force_arr[100];
-		int rb_foot_force_arr[100];
-		
-		int sensorValueFirstAverage(int *data);
-		int sensorValueLastAverage(int *data);
-
-		ContactStatus featureOne(int legId);
-		ContactStatus featureTwo(int legId);
-		ContactStatus featureThree(int legId);
+		float lf_const_;		
+		float rf_const_;	
+		float lb_const_;	
+		float rb_const_;	
 
 	public:     
 		FootContact();
 
-		void setSeqSize(int length);
-		void setFeatureOneThreshold(int lf_threshold, int rf_threshold, int lb_threshold, int rb_threshold);
-		void setFeatureTwoThreshold(int lf_threshold, int rf_threshold, int lb_threshold, int rb_threshold);
-		void setFeatureThreeThreshold(int lf_threshold, int rf_threshold, int lb_threshold, int rb_threshold);
+		void setThreshold(int lf_threshold, int rf_threshold, int lb_threshold, int rb_threshold);
+		void setConst(int lf, int rf, int lb, int rb);
 		void footForceDataUpdate(int lf_foot_force, int rf_foot_force, int lb_foot_force, int rb_foot_force);
 		void tdSingleEventDetect(int legId);
+		void tdEventDetect();
 		void tdSingleEventConditionDetect(int legId);
 		void init();
 		void clear();
-		int getLastfootForceData(int legId);
-		int getLastfootDiffForceData(int legId);
+		float getForceData(int legId);
+		float getForceConst(int legId);
 		void printThreshold();
-		void printForceArr();
 		void printForce();
+		void printConst();
 		bool isLegOnGround();
 		ContactStatus singleFootContactStatus(int legId);
+		std::vector<bool> contactStatus();
 		
 	};
 }

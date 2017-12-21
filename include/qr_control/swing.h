@@ -18,7 +18,7 @@ namespace qr_control {
     _Position get_rect_pos(_Position Start_point, _Position End_point, int Loop, int T, int H);
     _Position get_eclipse_pos(_Position Start_point, _Position End_point, int Loop,int T, int H);
     _Position compoundCycloidPosition(_Position Start_point, _Position End_point, int Loop,int T, int H);
-    _Position compoundCycloidVelocity(_Position Start_point, _Position End_point, int Loop, int T, int H);
+    EV3 compoundCycloidVelocity(_Position Start_point, _Position End_point, int Loop, int T, int H);
 
 };
 }
