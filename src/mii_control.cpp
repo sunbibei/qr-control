@@ -5,12 +5,11 @@
  *      Author: bibei
  */
 
-#include <mii_control.h>
-
 #include <foundation/cfg_reader.h>
 #include <foundation/auto_instanceor.h>
-#include <system/platform/thread/threadpool.h>
+#include <foundation/thread/threadpool.h>
 
+#include "mii_control.h"
 #include "gait/gait_manager.h"
 
 #include <thread>

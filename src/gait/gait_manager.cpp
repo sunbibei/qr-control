@@ -5,7 +5,7 @@
  *      Author: bibei
  */
 
-#include <gait/gait_manager.h>
+#include "gait/gait_manager.h"
 #include <foundation/cfg_reader.h>
 
 namespace qr_control {
@@ -37,7 +37,6 @@ bool GaitManager::init() {
 }
 
 void GaitManager::tick() {
-
   if ((!running_gait_) && (!active_gait_)) {
     return;
   } else if ((!running_gait_) && (active_gait_)) {
@@ -69,13 +68,13 @@ void GaitManager::activate(const MiiString& gait_name) {
 void GaitManager::print() {
   if (_DEBUG_INFO_FLAG) {
     LOG_WARNING << "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+";
-    LOG_WARNING << "\tNAME\t\tLABEL\t\tADDR";
+    LOG_WARNING << "NAME\t\tLABEL\t\tADDR";
     for (auto hw : res_list_) {
       LOG_INFO << hw->gait_name_ << "\t" << hw->getLabel() << "\t" << hw;
     }
     LOG_WARNING << "-------------------------------------------------------------";
-    LOG_INFO << "The current running gait: " << running_gait_;
-    LOG_INFO << "The current active  gait: " << active_gait_;
+    LOG_INFO << "The current running gait: " << (running_gait_ ? running_gait_->gait_name_ : "NULL");
+    LOG_INFO << "The current active  gait: " << (active_gait_  ? active_gait_->gait_name_  : "NULL");
     LOG_WARNING << "+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+";
   }
 }

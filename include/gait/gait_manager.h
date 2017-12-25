@@ -8,7 +8,7 @@
 #ifndef INCLUDE_GAIT_GAIT_MANAGER_H_
 #define INCLUDE_GAIT_GAIT_MANAGER_H_
 
-#include <system/platform/internal/resource_manager.h>
+#include <foundation/internal/resource_manager.h>
 #include "gait_base.h"
 
 #include <mutex>

@@ -8,7 +8,7 @@
 #ifndef INCLUDE_GAIT_CREEP_CREEP_H_
 #define INCLUDE_GAIT_CREEP_CREEP_H_
 
-#include <gait/gait_base.h>
+#include "gait/gait_base.h"
 
 namespace qr_control {
 

@@ -5,8 +5,8 @@
  *      Author: bibei
  */
 
-#include <gait/gait_base.h>
-#include <gait/gait_manager.h>
+#include "gait/gait_base.h"
+#include "gait/gait_manager.h"
 #include <foundation/cfg_reader.h>
 
 

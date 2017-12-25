@@ -21,7 +21,11 @@
     <build_depend>forward_command_controller</build_depend>
     <build_depend>dynamic_reconfigure</build_depend>
     <build_depend>qr_driver</build_depend>
+    <build_depend>mii_foundation</build_depend>
+    <build_depend>rl_agent_base</build_depend>
 
+    <run_depend>rl_agent_base</run_depend>
+    <run_depend>mii_foundation</run_depend>
     <run_depend>qr_driver</run_depend>
     <run_depend>cmake_modules</run_depend>
     <run_depend>kdl_parser</run_depend>

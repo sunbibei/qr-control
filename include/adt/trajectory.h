@@ -7,7 +7,7 @@
 
 #ifndef INCLUDE_ADT_TRAJECTORY_H_
 #define INCLUDE_ADT_TRAJECTORY_H_
-#include <foundation/utf.h>
+#include "foundation/utf.h"
 #include "internal/comma_init.h"
 
 #include <Eigen/Dense>

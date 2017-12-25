@@ -5,9 +5,10 @@
  *      Author: bibei
  */
 
-#include <gait/creep/creep.h>
+#include "gait/creep/creep.h"
+#include "robot/leg/qr_leg.h"
+
 #include <foundation/cfg_reader.h>
-#include <robot/leg/qr_leg.h>
 
 namespace qr_control {
 
@@ -76,10 +77,12 @@ bool Creep::init() {
     _tag = Label::make_label(getLabel(), "interface_" + std::to_string(++count));
   }
 
-  LOG_INFO << "get interface(LegType::FL): " << leg_ifaces_[LegType::FL];
-  LOG_INFO << "get interface(LegType::FR): " << leg_ifaces_[LegType::FR];
-  LOG_INFO << "get interface(LegType::HL): " << leg_ifaces_[LegType::HL];
-  LOG_INFO << "get interface(LegType::HR): " << leg_ifaces_[LegType::HR];
+  if (false) {
+    LOG_INFO << "get interface(LegType::FL): " << leg_ifaces_[LegType::FL];
+    LOG_INFO << "get interface(LegType::FR): " << leg_ifaces_[LegType::FR];
+    LOG_INFO << "get interface(LegType::HL): " << leg_ifaces_[LegType::HL];
+    LOG_INFO << "get interface(LegType::HR): " << leg_ifaces_[LegType::HR];
+  }
 
   return true;
 }

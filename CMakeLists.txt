@@ -6,8 +6,9 @@ add_definitions(-std=c++11)
 find_package(catkin REQUIRED
   COMPONENTS
   cmake_modules
-  # urdf
   qr_driver
+  mii_foundation
+  rl_agent_base
 )
 
 find_package(Boost REQUIRED COMPONENTS thread)
@@ -16,7 +17,7 @@ find_package(Eigen3 REQUIRED)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES
-  CATKIN_DEPENDS qr_driver
+  CATKIN_DEPENDS qr_driver mii_foundation
   DEPENDS
 )
 
@@ -38,6 +39,7 @@ set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
                       ${SRC_GAITS_ROOT}/gait_base.cpp
                       ${SRC_GAITS_ROOT}/creep/creep.cpp
                       ${SRC_GAITS_ROOT}/test/test_traj.cpp
+                      ${SRC_GAITS_ROOT}/agent/rl_agent.cpp
 )
 
 set(ROBOT_FILES       ${SRC_RO_LEG_ROOT}/data_leg.cpp
@@ -71,8 +73,9 @@ add_library(${PROJECT_NAME}_framwork
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_repository
   ${catkin_LIBRARIES}
-  qr_driver_foundation
-  qr_driver_registry
+  mii_foundation
+  mii_foundation_registry
+  rl_agent_base
 )
 
 target_link_libraries(${PROJECT_NAME}_framwork
@@ -98,7 +101,7 @@ install(TARGETS ${PROJECT_NAME}_repository
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-foreach(dir include launch config)
+foreach(dir launch config)
   install(DIRECTORY ${dir}/
     DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/${dir})
 endforeach(dir)

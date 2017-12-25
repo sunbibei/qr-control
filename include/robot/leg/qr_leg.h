@@ -9,7 +9,7 @@
 #ifndef INCLUDE_ROBOT_LEG_QR_LEG_H_
 #define INCLUDE_ROBOT_LEG_QR_LEG_H_
 
-#include <robot/leg/robot_leg.h>
+#include "robot/leg/robot_leg.h"
 
 namespace qr_control {
 
@@ -34,7 +34,7 @@ protected:
    * @param translation [out]  The current translation from the base frame.
    * @param quaternion  [out]  The current quaternion related to the base frame.
    */
-  virtual void forwardKinematics(const EVX& angle, EVX& jnt_pos) override;
+  virtual void forwardKinematics(Eigen::Vector3d&, Eigen::Quaterniond&) override;
   /*!
    * @brief The inverse kinematic solution, given the target of foot pose.
    * @param translation [in]  The target of the translation from the base frame.
@@ -42,11 +42,10 @@ protected:
    * @param jnt_pos     [out] The result of joint position.
    * @return Return true, if everything is OK, or return false.
    */
-  virtual void inverseKinematics(const EVX& jnt_pos, EVX& angle) override;
-  // virtual bool inverse_kinematics(
-  //       const Eigen::Vector3d& translation,   Eigen::Vector3d& jnt_pos) override;
-  // virtual bool inverse_kinematics(
-  //       const Eigen::Quaterniond& quaternion, Eigen::Vector3d& jnt_pos) override;
+  // virtual void inverseKinematics(const EVX& jnt_pos, EVX& angle) override;
+  virtual void inverseKinematics(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) override;
+  virtual void inverseKinematics(const Eigen::Vector3d&,   EVX& angle)  override;
+  virtual void inverseKinematics(const Eigen::Quaterniond&, EVX& angle) override;
 
 public:
 /*model property*/

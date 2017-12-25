@@ -6,9 +6,10 @@
  */
 
 #include "gait/test/test_traj.h"
+#include "robot/leg/qr_leg.h"
 
 #include <foundation/cfg_reader.h>
-#include <robot/leg/qr_leg.h>
+
 
 #define SPEC_CODE 1024
 
@@ -63,7 +64,7 @@ bool TestTraj::init() {
     _tag = Label::make_label(getLabel(), "interface_" + std::to_string(++count));
   }
 
-  if (_DEBUG_INFO_FLAG) {
+  if (false) {
     LOG_INFO << "get interface(LegType::FL): " << leg_ifaces_[LegType::FL];
     LOG_INFO << "get interface(LegType::FR): " << leg_ifaces_[LegType::FR];
     LOG_INFO << "get interface(LegType::HL): " << leg_ifaces_[LegType::HL];
@@ -354,15 +355,15 @@ void TestTraj::command() {
       if (LegType::N_LEGS == leg) {
         for (auto& iface : leg_ifaces_) {
           if (JntType::N_JNTS == jnt)
-            iface->joint_command_ref().fill(val);
+            iface->joint_command(JntType::N_JNTS, val);
           else
-            iface->joint_command_ref()(jnt) = val;
+            iface->joint_command(jnt, val);
         }
       } else {
         if (JntType::N_JNTS == jnt)
-          leg_ifaces_[leg]->joint_command_ref().fill(val);
+          leg_ifaces_[leg]->joint_command(JntType::N_JNTS, val);
         else
-          leg_ifaces_[leg]->joint_command_ref()(jnt) = val;
+          leg_ifaces_[leg]->joint_command(jnt, val);
       }
       std::cout << "\n\n\n\033[37;1mset " << cmds[3] << " command('" << cmds[4]
           << " into " << cmds[2] << " of " << cmds[1] << std::endl;

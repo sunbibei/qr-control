@@ -6,9 +6,9 @@
  */
 #include <iostream>
 #include <ros/ros.h>
-#include "gait/gait_manager.h"
-#include <foundation/cfg_reader.h>
-#include <foundation/auto_instanceor.h>
+#include "qr_next_control/gait/gait_manager.h"
+#include <mii_foundation/foundation/cfg_reader.h>
+#include <mii_foundation/foundation/auto_instanceor.h>
 
 #include <Eigen/Dense>
 
@@ -39,7 +39,7 @@ void create_system_instance() {
   Label::printfEveryInstance();
 }
 
-int main(int argc, char* argv[]) {
+int main1(int argc, char* argv[]) {
   ros::init(argc, argv, "test_qr");
   ros::NodeHandle nh;
 

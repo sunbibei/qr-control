@@ -5,7 +5,7 @@
  *      Author: bibei
  */
 
-#include <robot/leg/robot_leg.h>
+#include "robot/leg/robot_leg.h"
 
 ///! Just test
 // class Trajectory { };
@@ -15,30 +15,39 @@ namespace qr_control {
 RobotLeg::RobotLeg()
   : MathLeg(),
     curr_target_(TargetType::INVALID_TARGET) {
-  curr_target_jnt_ = JntType::UNKNOWN_JNT;
+  curr_target_jnt_for_traj_ = JntType::UNKNOWN_JNT;
 }
 
 RobotLeg::~RobotLeg() {
 }
-
-/*void RobotLeg::asyncMove(bool& ret_ref) {
+/*
+void RobotLeg::asyncMove(bool& ret_ref) {
   ;
 }*/
 
 void RobotLeg::move() {
   switch (curr_target_) {
+  case TargetType::LEG_CMD:
+    executLeg(leg_target_);
+    break;
   case TargetType::JNT_CMD:
-    execut(jnt_target_);
+    executJnt(jnt_target_);
     break;
   case TargetType::JNT_TRAJ:
     // Using the N_JNTS represent the all of joints.
-    if (JntType::N_JNTS != curr_target_jnt_)
-      followJntTrajectory(curr_target_jnt_, jnt_traj_target_);
+    if (JntType::N_JNTS != curr_target_jnt_for_traj_)
+      followJntTrajectory(curr_target_jnt_for_traj_, jnt_traj_target_);
     else
       followJntTrajectory(jnts_traj_target_);
     break;
   case TargetType::EEF_XYZ:
-    execut(eef_xyz_target_);
+    executEef(eef_target_.xyz);
+    break;
+  case TargetType::EEF_RPY:
+    executEef(eef_target_.rpy);
+    break;
+  case TargetType::EEF_POSE:
+    executEef(eef_target_);
     break;
   case TargetType::EEF_TRAJ:
     followEefTrajectory(eef_traj_target_);
@@ -48,27 +57,73 @@ void RobotLeg::move() {
   }
 }
 
-void RobotLeg::execut(const JntTarget& p) {
-  if (JntDataType::POS != p.jnt_cmd_type) {
-    LOG_ERROR << "Only Support Position Mode!";
-    joint_command_ref()(p.jnt_type) = p.target;
+void RobotLeg::executLeg(const LegTarget& p) {
+  if ((JntCmdType::CMD_POS == p.cmd_type)
+      || (JntCmdType::CMD_MOTOR_VEL == p.cmd_type)) {
+    joint_mode(p.cmd_type);
+    joint_command(p.target);
+  } else {
+    LOG_ERROR << "Only Support Position and Motor Velocity Mode!";
   }
 }
 
-void RobotLeg::execut(const EVX& p) {
-  EVX _jnt_cmd;
-  inverseKinematics(p, _jnt_cmd);
-  for (int i = 0; i < N_JNTS; ++i)
-    joint_command_ref()(i) = _jnt_cmd[i];
+void RobotLeg::executJnt(const JntTarget& p) {
+  if ((JntCmdType::CMD_POS == p.jnt_cmd_type)
+      || (JntCmdType::CMD_MOTOR_VEL == p.jnt_cmd_type)) {
+    joint_mode(p.jnt_cmd_type);
+    joint_command(p.jnt_type, p.target);
+  } else {
+    LOG_ERROR << "Only Support Position and Motor Velocity Mode!";
+  }
+}
+
+void RobotLeg::executEef(const EefTarget& p) {
+  EVX _jnt_pos;
+  if (TargetType::EEF_XYZ == curr_target_) {
+    inverseKinematics(p.xyz, _jnt_pos);
+  } else if (TargetType::EEF_RPY  == curr_target_) {
+    inverseKinematics(p.rpy, _jnt_pos);;
+  } else if (TargetType::EEF_POSE == curr_target_) {
+    inverseKinematics(p.xyz, p.rpy, _jnt_pos);;
+  } else {
+    LOG_ERROR << "What fucking code!";
+  }
+
+  joint_command(_jnt_pos);
+}
+
+void RobotLeg::executEef(const Eigen::Vector3d& xyz) {
+  EVX _jnt_pos;
+  inverseKinematics(xyz, _jnt_pos);
+
+  joint_command(_jnt_pos);
+}
+
+void RobotLeg::executEef(const Eigen::Quaterniond& rpy) {
+  EVX _jnt_pos;
+  inverseKinematics(rpy, _jnt_pos);
+
+  joint_command(_jnt_pos);
 }
 
 ///! setter methods
+void RobotLeg::legTarget(const LegTarget& t) {
+  leg_target_  = t;
+  curr_target_ = TargetType::LEG_CMD;
+}
+
+void RobotLeg::legTarget(JntCmdType jnt_cmd_type, const Eigen::VectorXd& target) {
+  leg_target_.cmd_type = jnt_cmd_type;
+  leg_target_.target   = target;
+  curr_target_         = TargetType::LEG_CMD;
+}
+
 void RobotLeg::jointTarget(const JntTarget& t) {
   jnt_target_  = t;
   curr_target_ = TargetType::JNT_CMD;
 }
 
-void RobotLeg::jointTarget(JntType jnt_type, JntDataType jnt_cmd_type, double target) {
+void RobotLeg::jointTarget(JntType jnt_type, JntCmdType jnt_cmd_type, double target) {
   jnt_target_.jnt_cmd_type = jnt_cmd_type;
   jnt_target_.jnt_type     = jnt_type;
   jnt_target_.target       = target;
@@ -76,31 +131,35 @@ void RobotLeg::jointTarget(JntType jnt_type, JntDataType jnt_cmd_type, double ta
 }
 
 void RobotLeg::jointTrajectoryTarget(JntType _t, const Trajectory1d& _traj) {
-  // TODO
-  curr_target_jnt_ = _t;
-  jnt_traj_target_ = _traj;
-  curr_target_     = TargetType::JNT_TRAJ;
+  curr_target_jnt_for_traj_ = _t;
+  jnt_traj_target_          = _traj;
+  curr_target_              = TargetType::JNT_TRAJ;
 }
 
 void RobotLeg::jointTrajectoryTarget(const Trajectory3d& _traj) {
-  // TODO
-  curr_target_jnt_  = JntType::N_JNTS;
-  jnts_traj_target_ = _traj;
-  curr_target_      = TargetType::JNT_TRAJ;
+  curr_target_jnt_for_traj_  = JntType::N_JNTS;
+  jnts_traj_target_          = _traj;
+  curr_target_               = TargetType::JNT_TRAJ;
 }
 
 void RobotLeg::eefOrientationTarget(const Eigen::Quaterniond& t) {
-  eef_rpy_target_ = t;
+  eef_target_.rpy = t;
   curr_target_    = TargetType::EEF_RPY;
 }
 
-void RobotLeg::eefPositionTarget(const EV3& t) {
-  eef_xyz_target_ = t;
+void RobotLeg::eefPositionTarget(const Eigen::Vector3d& t) {
+  eef_target_.xyz = t;
   curr_target_    = TargetType::EEF_XYZ;
 }
 
+void RobotLeg::eefTarget(const EefTarget& t) {
+  eef_target_  = t;
+  curr_target_ = TargetType::EEF_POSE;
+}
+
 void RobotLeg::eefTrajectoryTarget(const Trajectory3d& t) {
-  // TODO
+  eef_traj_target_ = t;
+  curr_target_     = TargetType::EEF_TRAJ;
 }
 
 ///! getter methods
@@ -113,21 +172,19 @@ const Trajectory1d&   RobotLeg::jointTrajectoryTarget() {
 }
 
 const Eigen::Quaterniond& RobotLeg::eefOrientationTarget() {
-  return eef_rpy_target_;
+  return eef_target_.rpy;
 }
 
 const EV3&    RobotLeg::eefPositionTarget() {
-  return eef_xyz_target_;
+  return eef_target_.xyz;
 }
 
 const Trajectory3d&   RobotLeg::eefTrajectoryTarget() {
   return eef_traj_target_;
 }
 
-void RobotLeg:: eefOriPos(EVX& _rpy, EVX& _xyz)
-{
-  _rpy = joint_position();
-  forwardKinematics(_rpy, _xyz);
+void RobotLeg:: eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy) {
+  forwardKinematics(_xyz, _rpy);
 }
 
 } /* namespace qr_control */

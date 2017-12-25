@@ -6,7 +6,7 @@
  *  Implemented by Sampson on Dec 8, 2017
  */
 
-#include <robot/leg/qr_leg.h>
+#include "robot/leg/qr_leg.h"
 #include <foundation/cfg_reader.h>
 #include <foundation/auto_instanceor.h>
 
@@ -44,9 +44,9 @@ QrLeg::~QrLeg()
 }
 
 void QrLeg::followJntTrajectory(JntType jnt, const Trajectory1d _traj)  {
-  auto& _jnt_poss = joint_position_const_ref();
-  auto& _jnt_vels = joint_velocity_const_ref();
-  auto& _jnt_cmds = joint_command_ref();
+  const auto& _jnt_poss = joint_position_const_ref();
+  const auto& _jnt_vels = joint_velocity_const_ref();
+  // const auto& _jnt_cmds = joint_command_ref();
 
   // Just for debug
   for (int i = 0; i < 10; ++i) {
@@ -71,8 +71,7 @@ void QrLeg::followEefTrajectory(const Trajectory3d)
   LOG_ERROR << "Call the 'followJntTrajectory' which has does not complemented.";
 }
 
-LegState QrLeg::leg_state() 
-{
+LegState QrLeg::leg_state()  {
   return state_leg_;
 }
 
@@ -224,16 +223,18 @@ Formula:
    Py = L0 * S0 + L1 * S0 * C1 + L2 * S0 * C12;
    Pz = - Lo * C0 - L1 * C0 * C1 - L2 * C0 * C12;
 */
-void QrLeg::forwardKinematics(const EVX& angle, EVX& jnt_pos)
-{  
-  jnt_pos(0) = params_->hip_len * sin(angle(1)) 
-                 + params_->knee_len * sin(angle(1) + angle(2));
-  jnt_pos(1) = params_->yaw_len * sin(angle(0)) 
-                 + params_->hip_len * sin(angle(0)) * cos(angle(1)) 
-                 + params_->knee_len * sin(angle(0)) * cos(angle(1) + angle(2));
-  jnt_pos(2) = - params_->yaw_len * cos(angle(0)) 
-                 - params_->hip_len * cos(angle(0)) * cos(angle(1)) 
-                 - params_->knee_len * cos(angle(0)) * cos(angle(1) + angle(2));
+// void QrLeg::forwardKinematics(const EVX& angle, EVX& jnt_pos)
+void QrLeg::forwardKinematics(Eigen::Vector3d& xyz, Eigen::Quaterniond&) {
+  // TODO
+  const auto& poss = joint_position_const_ref();
+  xyz(0) = params_->hip_len * sin(poss(1))
+                 + params_->knee_len * sin(poss(1) + poss(2));
+  xyz(1) = params_->yaw_len * sin(poss(0))
+                 + params_->hip_len * sin(poss(0)) * cos(poss(1))
+                 + params_->knee_len * sin(poss(0)) * cos(poss(1) + poss(2));
+  xyz(2) = - params_->yaw_len * cos(poss(0))
+                 - params_->hip_len * cos(poss(0)) * cos(poss(1))
+                 - params_->knee_len * cos(poss(0)) * cos(poss(1) + poss(2));
 }
 /*
 Description: calculating reverse kinematics for quadruped robot(3 DOF)
@@ -243,8 +244,10 @@ Formula:
    Theta_2 = sgn * acos((Delte^2 + Epsilon^2 - L1^2 - L2^2) / 2 / L1 / L2);
    Meantime, Delte = Px ; Phi = Delte + L2 * S2; Epsilon = L0 + Pz * C0 - Py * S0;
 */
-void QrLeg::inverseKinematics(const EVX& jnt_pos, EVX& angle)
-{
+// void QrLeg::inverseKinematics(const EVX& jnt_pos, EVX& angle) {
+void QrLeg::inverseKinematics(const Eigen::Vector3d& xyz, Eigen::VectorXd& angle) {
+  const auto& jnt_pos = joint_position_const_ref();
+
   int s = -1;  
   if ((LegType::HL == leg_type_) || (LegType::HR == leg_type_))
     s = 1;
@@ -258,6 +261,14 @@ void QrLeg::inverseKinematics(const EVX& jnt_pos, EVX& angle)
   Phi = (Phi==0)? 0.000001:Phi;
   
   angle(1) = 2*atan((Epsilon+sqrt(pow(Epsilon,2)-Phi*(params_->knee_len*sin(angle(2))-Delte)))/Phi);
+}
+
+void QrLeg::inverseKinematics(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) {
+  LOG_ERROR << "Call the 'inverseKinematics' which has does not complemented.";
+}
+
+void QrLeg::inverseKinematics(const Eigen::Quaterniond&, EVX& angle) {
+  LOG_ERROR << "Call the 'inverseKinematics' which has does not complemented.";
 }
 
 } /* namespace qr_control */

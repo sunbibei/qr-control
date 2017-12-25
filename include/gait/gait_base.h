@@ -121,7 +121,7 @@ void StateMachine<_State>::registerStateCallback(const _State& _s, _Func&& _f, _
   if (cb_map_.end() != cb_map_.find(_s)) {
     /*cb_map_.insert(std::make_pair(_s, std::bind(_f, _args)));
   } else {*/
-    LOG_WARNING << "Replace the old callback method for state(" << _s << ").";
+    LOG_WARNING << "Replace the old callback method for state."; // (" << _s << ").";
   }
 
   cb_map_[_s] = std::bind(_f, _args...);
