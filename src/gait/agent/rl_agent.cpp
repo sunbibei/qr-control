@@ -91,7 +91,7 @@ void RLAgent::checkState() {
     // Check whether we are close enough to the current target.
     double error = (X_ - target_X_pos_).norm();
     double vel = dX_.norm();
-    if (error < 0.1 && vel < 0.01) {
+    if (error < 0.1 && vel < 0.1) {
       LOG_WARNING << "Position target has arrived";
 
       if (is_report_waiting_) {
@@ -103,11 +103,11 @@ void RLAgent::checkState() {
       current_state_ = AGENT_STATE::RL_STATE_NOTHING;
     }
 
-    printf("JOINT ANGLES: {YAW: %+01.04f HIP: %+01.04f KNEE: %+01.04f}\n",
-        X_(JntType::YAW), X_(JntType::HIP), X_(JntType::KNEE));
-
     printf("JOINT TARGET: {YAW: %+01.04f HIP: %+01.04f KNEE: %+01.04f}\n",
         target_X_pos_(JntType::YAW), target_X_pos_(JntType::HIP), target_X_pos_(JntType::KNEE));
+
+    printf("JOINT ANGLES: {YAW: %+01.04f HIP: %+01.04f KNEE: %+01.04f ERROR: %+01.04f VEL: %+01.04f}\n",
+        X_(JntType::YAW), X_(JntType::HIP), X_(JntType::KNEE), error, vel);
 
     /*std::cout << "The current joint velocities: " << std::endl;
     for (int i = 0; i < dX_.size(); ++i)
