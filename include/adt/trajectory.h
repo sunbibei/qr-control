@@ -309,11 +309,11 @@ TRAJ_MAKE_TYPEDEFS(Type, TypeSuffix, 2, 2) \
 TRAJ_MAKE_TYPEDEFS(Type, TypeSuffix, 3, 3) \
 TRAJ_MAKE_TYPEDEFS(Type, TypeSuffix, 4, 4) \
 
-TRAJ_MAKE_TYPEDEFS_ALL_SIZES(int,                  i)
-TRAJ_MAKE_TYPEDEFS_ALL_SIZES(char,                 c)
-TRAJ_MAKE_TYPEDEFS_ALL_SIZES(short,                s)
-TRAJ_MAKE_TYPEDEFS_ALL_SIZES(float,                f)
-TRAJ_MAKE_TYPEDEFS_ALL_SIZES(double,               d)
+TRAJ_MAKE_TYPEDEFS_ALL_SIZES(int,    i)
+TRAJ_MAKE_TYPEDEFS_ALL_SIZES(char,   c)
+TRAJ_MAKE_TYPEDEFS_ALL_SIZES(short,  s)
+TRAJ_MAKE_TYPEDEFS_ALL_SIZES(float,  f)
+TRAJ_MAKE_TYPEDEFS_ALL_SIZES(double, d)
 
 #undef TRAJ_MAKE_TYPEDEFS_ALL_SIZES
 #undef TRAJ_MAKE_TYPEDEFS

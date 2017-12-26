@@ -14,6 +14,7 @@ namespace qr_control {
 
 RLAgent::RLAgent(const MiiString& _l)
   : GaitBase(_l), rl_agent::RobotPlugin2(_l),
+    gain_(1.0),
     /*current_state_(AGENT_STATE::UNKONWN_RL_STATE),*/
     state_machine_(nullptr),
     trial_leg_ifaces_(nullptr) {
@@ -37,6 +38,7 @@ bool RLAgent::init() {
   current_state_ = AGENT_STATE::RL_STATE_NOTHING;
 
   auto cfg       = MiiCfgReader::instance();
+  cfg->get_value(getLabel(), "gain", gain_);
 
   MiiString label;
   MiiString _tag = Label::make_label(getLabel(), "interface");
@@ -166,6 +168,7 @@ void RLAgent::trial() {
   // LOG_WARNING << "The Current Step: " << controller_counter_;
   if (!trial_controller_->control(X_, U_)) return;
 
+  U_ *= gain_;
   // Write the command into robot.
   trial_leg_ifaces_->legTarget(JntCmdType::CMD_MOTOR_VEL, U_);
 //  for (const auto& t : {JntType::YAW, JntType::HIP, JntType::KNEE})

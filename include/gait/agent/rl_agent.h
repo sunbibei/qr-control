@@ -48,6 +48,8 @@ protected:
   Eigen::VectorXd target_X_pos_;
   ///! The last joint velocities
   Eigen::VectorXd dX_;
+  ///! The command gain
+  double          gain_;
 
 protected:
   ///! The state machine corresponds with CreepState for creep
