@@ -51,7 +51,20 @@ void GaitManager::tick() {
     ;
   }
 
-  running_gait_->update();
+  ///! prev tick
+  running_gait_->prev_tick();
+
+  ///! check state change.
+  running_gait_->checkState();
+  if (nullptr == running_gait_->state_machine()) {
+    LOG_WARNING << "No StateMachine!";
+    return;
+  }
+  ///! call the callbacks
+  running_gait_->state_machine()->operator ()();
+
+  ///! post tick
+  running_gait_->post_tick();
 }
 
 void GaitManager::activate(const MiiString& gait_name) {

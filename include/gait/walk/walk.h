@@ -26,8 +26,10 @@ namespace qr_control {
 
 enum WalkState {
   UNKNOWN_WK_STATE = -1,
-  WK_INIT = 0,
+  WK_WAITING = 0,
+  WK_INIT_POSE,
   WK_SWING,
+  WK_HANG,
   N_WK_STATE,
 };
 
@@ -42,7 +44,8 @@ public:
 public:
   virtual void              checkState()    override;
   virtual StateMachineBase* state_machine() override;
-  WalkState                 currentState()  const;
+  virtual void              prev_tick() override;
+  virtual void              post_tick() override;
 
 protected:
   WalkState                  current_state_;
@@ -53,19 +56,32 @@ protected:
   QrLeg*          leg_ifaces_[LegType::N_LEGS];
   ///! The commands of legs.
   LegTarget       leg_cmds_[LegType::N_LEGS];
+  ///! Whether is hang?
+  bool            is_hang_walk_;
 
+///! These variable is temporary.
 private:
   middleware::Timer*    timer_;
+  bool                  is_send_init_cmds_;
+
+///! These methods are the callback method for WalkState.
+private:
+  ///! The callback for WK_WAITING
+  void waiting();
+  ///! The callback for WK_INIT_POSE
+  void pose_init();
+  ///! The callback for WK_XXX
+  void walk();
+  ///! The debug callback for WK_HANG
+  void hang_walk();
 
 private:
-  void update();
-
   void __initAllofData();
 
   void update_shoulder_pos(float pitch,float yaw,float roll);
   void forward_kinematics();
   void reverse_kinematics();
-  void pose_init();
+
   void cog_adj();
   void flow_control(int timeorder);
   void cog_pos_assign(_Position Adj);
@@ -100,7 +116,6 @@ protected:
   Swing* swing;
   Math* math;
   Gesture* gesture;
-  bool HangUpWalk;
 
   Quartic Height;
 

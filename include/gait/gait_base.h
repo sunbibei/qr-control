@@ -68,8 +68,8 @@ public:
    *        so cancel '=0'.
    * @return Return the current state, it could returns INVALID_STATE.
    */
-  template<typename _State>
-  _State currentState() const /*=0*/;
+//   template<typename _State>
+//   _State currentState() const /*=0*/;
 
 ///! These methods are asked to implement by sub-class.
 protected:
@@ -78,22 +78,33 @@ protected:
    *        the current state. This method should be a abstract method,
    *        but this class is needs to auto-instance, so cancel '=0'.
    */
-  virtual void checkState() /*= 0*/;
+  virtual void checkState() = 0;
 
   /**
    * @brief Get the state machine. This method will be implemented
    *        by sub-class.This method should be a abstract method, but
    *        this class is needs to auto-instance, so cancel '=0'.
    */
-  virtual StateMachineBase* state_machine() /*= 0*/;
-
+  virtual StateMachineBase* state_machine() = 0;
+  /*!
+   * @brief The current state whether could switch to ohter gait object.
+   */
   virtual bool canSwitch() /*= 0*/;
+
+  /*!
+   * @brief This method will be called before the callback of state.
+   */
+  virtual void prev_tick()  /*= 0*/;
+  /*!
+   * @brief This method will be called after the callback of state.
+   */
+  virtual void post_tick() /*= 0*/;
 
 protected:
   /*!
    * @brief This method will be called every tick.
    */
-  void update();
+  // void update();
 
 protected:
   MiiString    gait_name_;
@@ -137,11 +148,11 @@ void StateMachine<_State>::operator()() {
   cb_map_[current_state_]();
 }
 
-template<typename _State>
-_State GaitBase::currentState() const {
-  LOG_ERROR << "Call the base method 'currentState'";
-  return _State();
-}
+//template<typename _State>
+//_State GaitBase::currentState() const {
+//  LOG_ERROR << "Call the base method 'currentState'";
+//  return _State();
+//}
 
 
 } /* namespace qr_control */

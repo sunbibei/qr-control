@@ -31,27 +31,41 @@ GaitBase::~GaitBase() {
   // Nothing to do here.
 }
 
-void GaitBase::update() {
-  checkState();
-  if (nullptr == state_machine()) {
-    LOG_WARNING << "No StateMachine!";
-    return;
-  }
-  state_machine()->operator ()();
-}
+//void GaitBase::update() {
+//  checkState();
+//  if (nullptr == state_machine()) {
+//    LOG_WARNING << "No StateMachine!";
+//    return;
+//  }
+//  state_machine()->operator ()();
+//}
 
 bool GaitBase::canSwitch() {
   LOG_ERROR << "Call the base method 'canSwitch'";
   return true;
 }
 
-void GaitBase::checkState() {
-  LOG_ERROR << "Call the base method 'checkState'";
+//void GaitBase::checkState() {
+//  LOG_ERROR << "Call the base method 'checkState'";
+//}
+
+//StateMachineBase* GaitBase::state_machine() {
+//  LOG_ERROR << "Call the base method 'checkState'";
+//  return nullptr;
+//}
+
+/*!
+ * @brief This method will be called before the callback of state.
+ */
+void GaitBase::prev_tick()  {
+  ;
 }
 
-StateMachineBase* GaitBase::state_machine() {
-  LOG_ERROR << "Call the base method 'checkState'";
-  return nullptr;
+/*!
+ * @brief This method will be called after the callback of state.
+ */
+void GaitBase::post_tick() {
+  ;
 }
 
 } /* namespace qr_control */

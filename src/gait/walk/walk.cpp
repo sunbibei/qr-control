@@ -10,12 +10,38 @@
 #include <foundation/cfg_reader.h>
 #include <repository/resource/joint_manager.h>
 
-
 namespace qr_control {
+
+#define PRINT_PARAM_CURRENT_POS \
+    leg_ifaces_[LegType::FL]->joint_position_const_ref(), \
+    leg_ifaces_[LegType::FR]->joint_position_const_ref(), \
+    leg_ifaces_[LegType::HL]->joint_position_const_ref(), \
+    leg_ifaces_[LegType::HR]->joint_position_const_ref()
+
+#define PRINT_PARAM_TARGET_POS \
+    leg_cmds_[LegType::FL].target, \
+    leg_cmds_[LegType::FR].target, \
+    leg_cmds_[LegType::HL].target, \
+    leg_cmds_[LegType::HR].target
+
+#define PRINT_CURRENT_POS   __print_positions(PRINT_PARAM_CURRENT_POS);
+#define PRINT_POS_VS_TARGET __print_positions(PRINT_PARAM_CURRENT_POS, PRINT_PARAM_TARGET_POS);
+
+///! These are the inline functions forward declare.
+void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
+    const Eigen::VectorXd& hl, const Eigen::VectorXd& hr);
+
+void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
+    const Eigen::VectorXd& hl, const Eigen::VectorXd& hr,
+    const Eigen::VectorXd& tfl, const Eigen::VectorXd& tfr,
+    const Eigen::VectorXd& thl, const Eigen::VectorXd& thr);
+
+void __print_command(const LegTarget*);
 
 Walk::Walk()
   : current_state_(WalkState::UNKNOWN_WK_STATE),
-    state_machine_(nullptr), timer_(nullptr)
+    state_machine_(nullptr), is_hang_walk_(false),
+    timer_(nullptr), is_send_init_cmds_(false)
 {
   for (auto& iface : leg_ifaces_)
     iface = nullptr;
@@ -23,19 +49,37 @@ Walk::Walk()
   Loop_Count = 0;
 }
 
+Walk::~Walk() {
+  delete timer_;
+  timer_ = nullptr;
+
+  for (auto& iface : leg_ifaces_)
+    iface = nullptr;
+
+  delete foot_contact;
+  delete swing;
+  delete math;
+  delete gesture;
+}
+
 bool Walk::init() {
   if (!GaitBase::init()) return false;
 
   state_machine_ = new StateMachine<WalkState>(current_state_);
   state_machine_->registerStateCallback(
-      WalkState::WK_INIT,   &Walk::update,   this);
+      WalkState::WK_WAITING,   &Walk::waiting, this);
   state_machine_->registerStateCallback(
-      WalkState::WK_SWING,  &Walk::update,   this);
+      WalkState::WK_INIT_POSE, &Walk::pose_init, this);
+  state_machine_->registerStateCallback(
+      WalkState::WK_SWING,     &Walk::walk,    this);
+  state_machine_->registerStateCallback(
+      WalkState::WK_HANG,      &Walk::hang_walk, this);
 
-  current_state_ = WalkState::WK_INIT;
+  current_state_ = WalkState::WK_INIT_POSE;
 
   // TODO
   auto cfg = MiiCfgReader::instance();
+  cfg->get_value(getLabel(), "hang", is_hang_walk_);
 
   int count      = 0;
   LegType leg    = LegType::UNKNOWN_LEG;
@@ -111,7 +155,6 @@ bool Walk::init() {
 
   Isstand_stable = false;
   All_on_ground = false;
-  HangUpWalk = true;
 
   timer_ = new middleware::Timer;
   timer_->start();
@@ -119,24 +162,33 @@ bool Walk::init() {
   return true;
 }
 
-Walk::~Walk() {
-  delete timer_;
-  timer_ = nullptr;
-
-  delete foot_contact;
-  delete swing;
-  delete math;
-  delete gesture;
-}
-
 void Walk::checkState() {
   // TODO
   switch (current_state_) {
-  case WalkState::WK_INIT:
+  case WalkState::WK_INIT_POSE:
   {
+    if (!is_send_init_cmds_) return;
+    for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
+      auto diff = (leg_cmds_[l].target - leg_ifaces_[l]->joint_position_const_ref()).norm();
+      if (diff > 0.1) return;
+    }
+    LOG_WARNING << "INIT POSE OK!";
+    PRINT_POS_VS_TARGET
+    // It has reach the target positions.
+    // TODO
+    current_state_ = ((is_hang_walk_) ? WalkState::WK_HANG : WalkState::WK_WAITING);
+    is_send_init_cmds_ = false;
+    LOG_WARNING << "The robot has reached the initialization pose, input any key to continue";
+    getchar();
+
+    Time_Order = 1;
     break;
   }
   case WalkState::WK_SWING:
+  {
+    break;
+  }
+  case WalkState::WK_HANG:
   {
     break;
   }
@@ -149,7 +201,22 @@ void Walk::checkState() {
 
 StateMachineBase* Walk::state_machine() { return state_machine_; }
 
-WalkState Walk::currentState()  const   { return current_state_; }
+void Walk::prev_tick() {
+  gesture->updateImuData(imu_quat_[0], imu_quat_[1], imu_quat_[2]);
+  // gesture->printImuAngle();
+  foot_contact->footForceDataUpdate(
+      td_handles_[0]->force_data(), td_handles_[1]->force_data(),
+      td_handles_[2]->force_data(), td_handles_[3]->force_data());
+}
+
+void Walk::post_tick() {
+  // std::cout << "Walk::post_tick()" << std::endl;
+  command_assign(Angle_ptr);
+  for (const auto& leg : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
+    leg_ifaces_[leg]->legTarget(leg_cmds_[leg]);
+    leg_ifaces_[leg]->move();
+  }
+}
 
 /**************************************************************************
  Description: Update Angles
@@ -196,10 +263,101 @@ void Walk::__initAllofData() {
   imu_quat_    = imu_handle_->orientation_const_pointer();
 }
 
-/**************************************************************************
- Description: design state meachine: Adjust CoG <---> Switch Swing Leg
-**************************************************************************/
-void Walk::update() {
+void Walk::waiting() {
+  LOG_WARNING << "Waiting the user operator, press any key to continue.";
+  getchar();
+}
+
+void Walk::pose_init() {
+  if (!is_send_init_cmds_) {
+    Pos_ptr->rb.z = -Stance_Height;
+    Pos_ptr->lb.z = -Stance_Height;
+    Pos_ptr->rf.z = -Stance_Height;
+    Pos_ptr->lf.z = -Stance_Height;
+
+    Pos_ptr->lf.y = 0;
+    Pos_ptr->rf.y = 0;
+    Pos_ptr->lb.y = 0;
+    Pos_ptr->rb.y = 0;
+
+    Pos_ptr->lf.x = 0;
+    Pos_ptr->rf.x = 0;
+    Pos_ptr->lb.x = 0;
+    Pos_ptr->rb.x = 0;
+    reverse_kinematics();
+  }
+
+  is_send_init_cmds_ = true;
+  PRINT_POS_VS_TARGET
+
+}
+
+void Walk::hang_walk() {
+  //LOG_WARNING << "--------------------hang walk--------------------------";
+  count_loop++;
+  if (count_loop > 5) {
+    count_loop = 0;
+
+    switch (Time_Order) {
+      case 1:
+        Isstand_stable = true;
+        foot_contact->clear();
+        Loop_Count = 0;
+        Time_Order=2;
+        break;
+      case 2:
+        cog_adj();
+        if(Loop_Count>=Stance_Num)
+        {
+          Loop_Count = 0;
+          // std::cout<<"flow_control: cog done"<<std::endl;
+          Time_Order=3;
+          // std::cout<<"Robot moving CoG! Please input 3 to continue:";
+          // std::cin>>Time_Order;
+          assign_next_foot();
+          LOG_WARNING << "*******----case 3----*******";
+        }
+        break;
+      case 3://swing leg
+        swing_control();
+        if((Leg_On_Ground && !is_hang_walk_) || (Loop_Count>=Swing_Num && is_hang_walk_))
+        // if(Loop_Count>=Swing_Num)
+        {
+          // std::cout<<"flow_control: swing done"<<std::endl;
+          test_tmp = 0;
+          Loop_Count = 0;
+          for(int i=0;i<Leg_Num;i++)
+          {
+            SupportLeg[Leg_Order] = true;
+          }
+          foot_contact->clear();
+
+          Time_Order = 2;
+          // std::cout<<"Robot swing done! Please input 2 to continue:";
+          // std::cin>>Time_Order;
+          Leg_Order = (Leg_Order>1)?Leg_Order-2:3-Leg_Order;
+          std::cout<<"*******----case 4----*******"<<std::endl;
+        }
+        break;
+      default:
+        LOG_ERROR << "What fucking control!";
+        break;
+    } // end switch (Time_Order)
+  Loop_Count++;
+  } // end if(count_loop>5)
+/*************************************************************************************************************/
+/*******************************************Loop: 100 Hz******************************************************/
+/*************************************************************************************************************/
+  printf("HEIGHT: %+02.04f %+02.04f %+02.04f %+02.04f\n",
+      Pos_ptr->lf.z, Pos_ptr->rf.z, Pos_ptr->lb.z, Pos_ptr->rb.z);
+
+  //LOG_WARNING << "====================hang walk==========================";
+  //printf("\n\n");
+  // LOG_INFO << "Loop time used: " << timer_->dt() << " ms.";
+}
+
+
+void Walk::walk() {
 /*************************************************************************************************************/
 /*******************************************Loop: 100 Hz******************************************************/
 /*************************************************************************************************************/
@@ -210,7 +368,7 @@ void Walk::update() {
                                    td_handles_[2]->force_data(), td_handles_[3]->force_data());
   foot_contact->printForce();
 
-  if(Isstand_stable && !HangUpWalk)//contact_control
+  if(Isstand_stable && !is_hang_walk_)//contact_control
   {
     foot_contact->tdEventDetect();
     foot_contact->printContactStatus();
@@ -227,48 +385,42 @@ void Walk::update() {
 /*************************************************************************************************************/
   count_loop++;
   // if(count_loop>5 ||(Time_Order==3 && Loop_Count>Swing_Num/3*2 && foot_contact->singleFootContactStatus(Leg_Order)))
-  if(count_loop>5)
-  {
+  if(count_loop>5) {
   count_loop = 0;
 
   switch (Time_Order)
   {
     case 0: //init gesture
-    pose_init();
-    flow_control(Time_Order);
-    break;
-
+      pose_init();
+      flow_control(Time_Order);
+      break;
     case 1:
-    if(!HangUpWalk)
-    {
-      foot_contact->tdEventDetect();
-      if(Loop_Count>3)
-      {
-        Isstand_stable = stand_stable(foot_contact->contactStatus());
+      if(!is_hang_walk_) {
+        foot_contact->tdEventDetect();
+        if(Loop_Count>3)
+        {
+          Isstand_stable = stand_stable(foot_contact->contactStatus());
+        }
+        if(Isstand_stable)
+        {
+          gesture->imuCalibration();
+        }
+      } else {
+        Isstand_stable = true;
       }
-      if(Isstand_stable)
-      {
-        gesture->imuCalibration();
-      }
-    }
-    else
-    {
-      Isstand_stable = true;
-    }
-    flow_control(Time_Order);
-    break;
-
+      flow_control(Time_Order);
+      break;
     case 2:
-    cog_adj();
-    flow_control(Time_Order);
-    break;
-
+      cog_adj();
+      flow_control(Time_Order);
+      break;
     case 3://swing leg
-    swing_control();
-    flow_control(Time_Order);
-    break;
-
-    default:break;
+      swing_control();
+      flow_control(Time_Order);
+      break;
+    default:
+      LOG_ERROR << "What fucking control!";
+      break;
   }
   Loop_Count++;
   }
@@ -287,30 +439,7 @@ void Walk::update() {
   LOG_INFO << "Loop time used: " << timer_->dt() << " ms.";
 }
 
-void Walk::print_command() {
-  printf("_________________________________\n");
-  printf("LEG -|   YAW  |   HIP  |  KNEE  |\n");
-  printf("FL  -| %+01.04f| %+01.04f| %+01.04f|\n",
-      leg_cmds_[LegType::FL].target(JntType::YAW),
-      leg_cmds_[LegType::FL].target(JntType::HIP),
-      leg_cmds_[LegType::FL].target(JntType::KNEE));
 
-  printf("FR  -| %+01.04f| %+01.04f| %+01.04f|\n",
-      leg_cmds_[LegType::FR].target(JntType::YAW),
-      leg_cmds_[LegType::FR].target(JntType::HIP),
-      leg_cmds_[LegType::FR].target(JntType::KNEE));
-
-  printf("HL  -| %+01.04f| %+01.04f| %+01.04f|\n",
-      leg_cmds_[LegType::HL].target(JntType::YAW),
-      leg_cmds_[LegType::HL].target(JntType::HIP),
-      leg_cmds_[LegType::HL].target(JntType::KNEE));
-
-  printf("HR  -| %+01.04f| %+01.04f| %+01.04f|\n",
-      leg_cmds_[LegType::HR].target(JntType::YAW),
-      leg_cmds_[LegType::HR].target(JntType::HIP),
-      leg_cmds_[LegType::HR].target(JntType::KNEE));
-  printf("---------------------------------\n");
-}
 
 bool Walk::stand_stable(std::vector<bool> IsContact) {
   int phase = 1, t = 100;
@@ -519,7 +648,7 @@ switch(timeorder)
     foot_contact->clear();    
     Loop_Count = 0;
     // std::cout<<"Imu data calibration done!"<<std::endl;
-    if(!HangUpWalk)
+    if(!is_hang_walk_)
     {
       std::cout<<"Robot has stand stable! Please input 2 to continue:"; 
       std::cin>>Time_Order; 
@@ -546,7 +675,7 @@ switch(timeorder)
   break;
 
   case 3:
-  if((Leg_On_Ground && !HangUpWalk) || (Loop_Count>=Swing_Num && HangUpWalk))
+  if((Leg_On_Ground && !is_hang_walk_) || (Loop_Count>=Swing_Num && is_hang_walk_))
   // if(Loop_Count>=Swing_Num)
   {
     // std::cout<<"flow_control: swing done"<<std::endl;
@@ -620,25 +749,6 @@ switch (legId)
 /**************************************************************************
  Description: Initialization. Foot position is relative to its corresponding shoulder
 **************************************************************************/
-void Walk::pose_init()
-{
-Pos_ptr->rb.z = -Stance_Height;
-Pos_ptr->lb.z = -Stance_Height;
-Pos_ptr->rf.z = -Stance_Height;
-Pos_ptr->lf.z = -Stance_Height;
-
-Pos_ptr->lf.y = 0;
-Pos_ptr->rf.y = 0;
-Pos_ptr->lb.y = 0;
-Pos_ptr->rb.y = 0;
-
-Pos_ptr->lf.x = 0;
-Pos_ptr->rf.x = 0;
-Pos_ptr->lb.x = 0;
-Pos_ptr->rb.x = 0;
-reverse_kinematics();
-}
-
 
 void Walk::forward_kinematics()
 {
@@ -649,8 +759,7 @@ Pos_ptr->rb = math->cal_formula(Angle_ptr->rb);
 }
 
 
-void Walk::reverse_kinematics()
-{
+void Walk::reverse_kinematics() {
 Angle_ptr->lf = math->cal_kinematics(Pos_ptr->lf,-1);
 Angle_ptr->rf = math->cal_kinematics(Pos_ptr->rf,-1);
 Angle_ptr->lb = math->cal_kinematics(Pos_ptr->lb, 1);
@@ -938,6 +1047,83 @@ void Walk::command_assign(Angle_Ptr Angle) {
   leg_cmds_[LegType::HR].target(JntType::KNEE) = Angle->rb.knee;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+////////////        The implementation of inline methods         ////////////
+///////////////////////////////////////////////////////////////////////////////
+void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
+    const Eigen::VectorXd& hl, const Eigen::VectorXd& hr) {
+  printf("___________________________________________________________________\n");
+  printf("|LEG -|   YAW  |   HIP  |  KNEE  |LEG -|   YAW  |   HIP  |  KNEE  |\n");
+//printf("LEG -| +0.0000| +0.0000| +0.0000|LEG -| +0.0000| +0.0000| +0.0000|\n");
+  printf("| FL -| %+01.04f| %+01.04f| %+01.04f|",
+      fl(JntType::YAW), fl(JntType::HIP), fl(JntType::KNEE));
+  printf(" FR -| %+01.04f| %+01.04f| %+01.04f|\n",
+      fr(JntType::YAW), fr(JntType::HIP), fr(JntType::KNEE));
+
+  printf("| HL -| %+01.04f| %+01.04f| %+01.04f|",
+      hl(JntType::YAW), hl(JntType::HIP), hl(JntType::KNEE));
+  printf(" HR -| %+01.04f| %+01.04f| %+01.04f|\n",
+      hr(JntType::YAW), hr(JntType::HIP), hr(JntType::KNEE));
+  printf("-------------------------------------------------------------------\n");
+}
+
+void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
+    const Eigen::VectorXd& hl, const Eigen::VectorXd& hr,
+    const Eigen::VectorXd& tfl, const Eigen::VectorXd& tfr,
+        const Eigen::VectorXd& thl, const Eigen::VectorXd& thr) {
+  printf("_____________________________________________________________________________________\n");
+  printf("|LEG -|   YAW  |   HIP  |  KNEE  |  ERROR |LEG -|   YAW  |   HIP  |  KNEE  |  ERROR |\n");
+//printf("|LEG -| +0.0000| +0.0000| +0.0000| +0.0000|LEG -| +0.0000| +0.0000| +0.0000| +0.0000|\n");
+  printf("| FL -| %+01.04f| %+01.04f| %+01.04f|    -   |",
+      fl(JntType::YAW), fl(JntType::HIP), fl(JntType::KNEE));
+  printf(" FR -| %+01.04f| %+01.04f| %+01.04f|    -   |\n",
+      fr(JntType::YAW), fr(JntType::HIP), fr(JntType::KNEE));
+
+  auto diff1 = (tfl - fl).norm();
+  auto diff2 = (tfr - fr).norm();
+  printf("| FL =| %+01.04f| %+01.04f| %+01.04f| %+01.04f|",
+      tfl(JntType::YAW), tfl(JntType::HIP), tfl(JntType::KNEE), diff1);
+  printf(" FR =| %+01.04f| %+01.04f| %+01.04f| %+01.04f|\n",
+      tfr(JntType::YAW), tfr(JntType::HIP), tfr(JntType::KNEE), diff2);
+
+  printf("| HL -| %+01.04f| %+01.04f| %+01.04f|    -   |",
+      hl(JntType::YAW), hl(JntType::HIP), hl(JntType::KNEE));
+  printf(" HR -| %+01.04f| %+01.04f| %+01.04f|    -   |\n",
+      hr(JntType::YAW), hr(JntType::HIP), hr(JntType::KNEE));
+
+  diff1 = (thl - hl).norm();
+  diff2 = (thr - hr).norm();
+  printf("| HL =| %+01.04f| %+01.04f| %+01.04f| %+01.04f|",
+      thl(JntType::YAW), thl(JntType::HIP), thl(JntType::KNEE), diff1);
+  printf(" HR =| %+01.04f| %+01.04f| %+01.04f| %+01.04f|\n",
+      thr(JntType::YAW), thr(JntType::HIP), thr(JntType::KNEE), diff2);
+  printf("-------------------------------------------------------------------------------------\n");
+}
+
+void __print_command(const LegTarget* leg_cmds_) {
+  printf("_________________________________\n");
+  printf("LEG -|   YAW  |   HIP  |  KNEE  |\n");
+  printf("FL  -| %+01.04f| %+01.04f| %+01.04f|\n",
+      leg_cmds_[LegType::FL].target(JntType::YAW),
+      leg_cmds_[LegType::FL].target(JntType::HIP),
+      leg_cmds_[LegType::FL].target(JntType::KNEE));
+
+  printf("FR  -| %+01.04f| %+01.04f| %+01.04f|\n",
+      leg_cmds_[LegType::FR].target(JntType::YAW),
+      leg_cmds_[LegType::FR].target(JntType::HIP),
+      leg_cmds_[LegType::FR].target(JntType::KNEE));
+
+  printf("HL  -| %+01.04f| %+01.04f| %+01.04f|\n",
+      leg_cmds_[LegType::HL].target(JntType::YAW),
+      leg_cmds_[LegType::HL].target(JntType::HIP),
+      leg_cmds_[LegType::HL].target(JntType::KNEE));
+
+  printf("HR  -| %+01.04f| %+01.04f| %+01.04f|\n",
+      leg_cmds_[LegType::HR].target(JntType::YAW),
+      leg_cmds_[LegType::HR].target(JntType::HIP),
+      leg_cmds_[LegType::HR].target(JntType::KNEE));
+  printf("---------------------------------\n");
+}
 
 } /* namespace qr_control */
 
