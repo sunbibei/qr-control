@@ -2,9 +2,9 @@
 #define QR_CONTROL_FOOT_CONTACT_H_
 
 #include <cmath>
-#include "qr_control/ultility.h"
 #include <iostream>
 
+#include "ultility.h"
 
 enum ContactStatus {None=0, Deep};
 
@@ -27,6 +27,7 @@ namespace qr_control {
 		int rf_threshold_;
 		int lb_threshold_;
 		int rb_threshold_;	
+		int upper_thres_;
 
 		float lf_foot_force_;		
 		float rf_foot_force_;	
@@ -42,10 +43,12 @@ namespace qr_control {
 		FootContact();
 
 		void setThreshold(int lf_threshold, int rf_threshold, int lb_threshold, int rb_threshold);
+		void setUpperThreshold(int threshold);
 		void setConst(int lf, int rf, int lb, int rb);
 		void footForceDataUpdate(int lf_foot_force, int rf_foot_force, int lb_foot_force, int rb_foot_force);
 		void tdSingleEventDetect(int legId);
 		void tdEventDetect();
+		bool overDetect(int legId);
 		void tdSingleEventConditionDetect(int legId);
 		void init();
 		void clear();
@@ -54,6 +57,8 @@ namespace qr_control {
 		void printThreshold();
 		void printForce();
 		void printConst();
+		void printContactStatus();
+
 		bool isLegOnGround();
 		ContactStatus singleFootContactStatus(int legId);
 		std::vector<bool> contactStatus();

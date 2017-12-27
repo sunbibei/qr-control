@@ -1,4 +1,4 @@
-#include "qr_control/foot_contact.h"
+#include "gait/walk/foot_contact.h"
 
 using namespace qr_control;
 
@@ -22,6 +22,11 @@ void FootContact::setThreshold(int lf_threshold, int rf_threshold, int lb_thresh
 	lb_threshold_ = lb_threshold;
 	rb_threshold_ = rb_threshold;
 }
+void FootContact::setUpperThreshold(int threshold)
+{
+	upper_thres_ = threshold;
+}
+
 
 void FootContact::setConst(int lf, int rf, int lb, int rb)
 {
@@ -56,9 +61,25 @@ void FootContact::tdSingleEventDetect(int legId)
 	}
 }
 
+bool FootContact::overDetect(int legId)
+{
+	switch(legId)
+	{
+		case LF:				
+			return ((lf_foot_force_ > upper_thres_) ? true : false);			
+		case RF:		
+			return ((rf_foot_force_ > upper_thres_) ? true : false);
+		case LB:
+			return ((lb_foot_force_ > upper_thres_) ? true : false);		
+		case RB:	
+			return ((rb_foot_force_ > upper_thres_) ? true : false);		
+		default:break;
+	}	
+	return false;
+}
 void FootContact::tdEventDetect()
 {
-  lf_contact_status = (lf_foot_force_ > lf_threshold_) ? Deep : None;			  
+    lf_contact_status = (lf_foot_force_ > lf_threshold_) ? Deep : None;			  
 	rf_contact_status = (rf_foot_force_ > rf_threshold_) ? Deep : None;			 
 	lb_contact_status = (lb_foot_force_ > lb_threshold_) ? Deep : None;			  
 	rb_contact_status = (rb_foot_force_ > rb_threshold_) ? Deep : None;	
@@ -193,4 +214,13 @@ void FootContact::printForce()
 	std::cout<<"rf:"<<rf_foot_force_<<" ";
 	std::cout<<"lb:"<<lb_foot_force_<<" ";
 	std::cout<<"rb:"<<rb_foot_force_<<std::endl;
+}
+
+void FootContact::printContactStatus()
+{
+	std::cout<<"Class FootContact: printContactStatus"<<" ";
+	std::cout<<"lf:"<<lf_contact_status<<" ";
+	std::cout<<"rf:"<<rf_contact_status<<" ";
+	std::cout<<"lb:"<<lb_contact_status<<" ";
+	std::cout<<"rb:"<<rb_contact_status<<std::endl;
 }

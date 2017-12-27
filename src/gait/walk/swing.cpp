@@ -1,4 +1,4 @@
-#include "qr_control/swing.h"
+#include "gait/walk/swing.h"
 
 using namespace qr_control;
 

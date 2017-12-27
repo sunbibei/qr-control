@@ -1,4 +1,4 @@
-#include "qr_control/math.h"
+#include "gait/walk/math.h"
 
 using namespace qr_control;
 
