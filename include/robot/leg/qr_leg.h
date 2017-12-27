@@ -16,16 +16,21 @@ namespace qr_control {
 class QrLeg: public RobotLeg {
 public:
   QrLeg();
+  virtual bool init() override;
+
   virtual ~QrLeg();
 
-///! inhert from RobotLeg
+///! inherit from RobotLeg
 protected:
   virtual void followJntTrajectory(JntType, const Trajectory1d) override;
   virtual void followJntTrajectory(const Trajectory3d) override;
   virtual void followEefTrajectory(const Trajectory3d) override;
 
-// inhert from MathLeg
+// inherit from MathLeg
 public:
+  ///! Offer the interface to change the touch down threshold in the runtime.
+  void setForceThreshold(double);
+  ///! get the current leg state.
   virtual LegState leg_state() override;
 
 protected:
@@ -47,6 +52,9 @@ protected:
   virtual void inverseKinematics(const Eigen::Vector3d&,   EVX& angle)  override;
   virtual void inverseKinematics(const Eigen::Quaterniond&, EVX& angle) override;
 
+protected:
+  double     td_thres_;
+
 public:
 /*model property*/
   void printDH();
@@ -59,19 +67,11 @@ public:
   EV3 jointVelToFoot(const EV3& joint_pos, const EV3& joint_vel);
   EV3 footVelToJoint(const EV3& joint_pos, const EV3& foot_vel);
   bool getJacobMatrix(const EV3& a, EM3& JacobMatrix, EM3& inverseJacobMatrix);
-/*foot force process*/
-  void setTouchdownThreshold(const double& threshold);
-  void touchDownDetect();
-  void touchDownConditionDetect();
-  void liftDetect();
-  void liftConditionDetect();
 
-  
 
- private:
+private:
   class __PrivateParam* params_;
-  LegState state_leg_;
-  double td_threshold_;
+
 };
 
 } /* namespace qr_control */

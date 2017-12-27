@@ -74,14 +74,6 @@ private:
   std::vector<middleware::ForceSensor*>       td_handles_;
   middleware::ImuSensor*                      imu_handle_;
 
-  const double*                  imu_ang_vel_;
-  const double*                  imu_lin_acc_;
-  const double*                  imu_quat_;
-
-  std::vector<const double*>     jnt_poss_;
-  std::vector<const double*>     jnt_vels_;
-  std::vector<const double*>     jnt_tors_;
-
 ///! These methods are the callback method for WalkState.
 private:
   ///! The callback for WK_WAITING
@@ -104,8 +96,6 @@ private:
   _Position    get_CoG_adj_vec(const _Position&, LegType);
 
 private:
-  void __initAllofData();
-
   void update_shoulder_pos(float pitch,float yaw,float roll);
   void forward_kinematics();
   void reverse_kinematics();
@@ -125,7 +115,7 @@ private:
 
   bool stand_stable(std::vector<bool> IsContact);
   bool contact_keep(std::vector<bool> IsContact);
-  void sensor_height();
+  // void sensor_height();
   void posture_keep(std::vector<bool> IsContact);
 
   void forward_control(float Kp,float Kv,float Kd);
@@ -140,7 +130,7 @@ protected:
   float test_tmp;
   int n_joints_;
   int foot_sensor_const;
-  FootContact* foot_contact;
+  FootContact* foot_contact1;
   Swing* swing;
   Math* math;
   Gesture* gesture;

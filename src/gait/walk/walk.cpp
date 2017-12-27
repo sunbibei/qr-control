@@ -58,7 +58,7 @@ Walk::~Walk() {
   for (auto& iface : leg_ifaces_)
     iface = nullptr;
 
-  delete foot_contact;
+  delete foot_contact1;
   delete swing;
   delete math;
   delete gesture;
@@ -128,16 +128,15 @@ bool Walk::init() {
       LOG_ERROR << "The named '" << imu_label << "' qr.res.imu sensor does not exist!";
   }
 
-  imu_ang_vel_ = imu_handle_->angular_velocity_const_pointer();
-
 //  joint_state_publisher_.reset( new realtime_tools::RealtimePublisher<
 //    std_msgs::Float64MultiArray>(n, "/dragon/joint_commands", 10));
 
   // foot contact process
-  foot_contact = new FootContact();
-  foot_contact->setThreshold(920, 900, 760, 850);
-  foot_contact->setUpperThreshold(3800);
-  foot_contact->init();
+  // TODO
+//  foot_contact1 = new FootContact();
+//  foot_contact1->setThreshold(920, 900, 760, 850);
+//  foot_contact1->setUpperThreshold(3800);
+//  foot_contact1->init();
 
   swing = new Swing();
   swing->init();
@@ -152,8 +151,6 @@ bool Walk::init() {
     height.push_back(-Stance_Height);
     SupportLeg.push_back(true);
   }
-
-  __initAllofData();
 
   Isstand_stable = false;
   All_on_ground = false;
@@ -204,11 +201,8 @@ void Walk::checkState() {
 StateMachineBase* Walk::state_machine() { return state_machine_; }
 
 void Walk::prev_tick() {
-  gesture->updateImuData(imu_quat_[0], imu_quat_[1], imu_quat_[2]);
-  // gesture->printImuAngle();
-  foot_contact->footForceDataUpdate(
-      td_handles_[0]->force_data(), td_handles_[1]->force_data(),
-      td_handles_[2]->force_data(), td_handles_[3]->force_data());
+  // TODO
+  // gesture->updateImuData(imu_quat_[0], imu_quat_[1], imu_quat_[2]);
 }
 
 void Walk::post_tick() {
@@ -218,51 +212,6 @@ void Walk::post_tick() {
     leg_ifaces_[leg]->legTarget(leg_cmds_[leg]);
     leg_ifaces_[leg]->move();
   }
-}
-
-/**************************************************************************
- Description: Update Angles
-**************************************************************************/
-void Walk::sensor_height() {
-  Angle_ptr->lf.knee = *(jnt_poss_[0]);
-  Angle_ptr->lf.hip  = *(jnt_poss_[1]);
-  Angle_ptr->lf.pitch= *(jnt_poss_[2]);
-
-  Angle_ptr->rf.knee = *(jnt_poss_[3]);
-  Angle_ptr->rf.hip  = *(jnt_poss_[4]);
-  Angle_ptr->rf.pitch= *(jnt_poss_[5]);
-
-  Angle_ptr->lb.knee = *(jnt_poss_[6]);
-  Angle_ptr->lb.hip  = *(jnt_poss_[7]);
-  Angle_ptr->lb.pitch= *(jnt_poss_[8]);
-
-  Angle_ptr->rb.knee = *(jnt_poss_[9]);
-  Angle_ptr->rb.hip  = *(jnt_poss_[10]);
-  Angle_ptr->rb.pitch= *(jnt_poss_[11]);
-}
-
-
-/**************************************************************************
- Description: initializition from robot_description
-**************************************************************************/
-void Walk::__initAllofData() {
-  jnt_poss_.reserve(LegType::N_LEGS * JntType::N_JNTS);
-  jnt_vels_.reserve(LegType::N_LEGS * JntType::N_JNTS);
-  jnt_tors_.reserve(LegType::N_LEGS * JntType::N_JNTS);
-
-  auto jnt_manager = middleware::JointManager::instance();
-  for (const auto& leg : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-    for (const auto& jnt : {JntType::KNEE, JntType::HIP, JntType::YAW}) {
-      auto j = jnt_manager->getJointHandle(leg, jnt);
-      jnt_poss_.push_back(j->joint_position_const_pointer());
-      jnt_vels_.push_back(j->joint_velocity_const_pointer());
-      jnt_tors_.push_back(j->joint_torque_const_pointer());
-    }
-  }
-
-  imu_ang_vel_ = imu_handle_->angular_velocity_const_pointer();
-  imu_lin_acc_ = imu_handle_->linear_acceleration_const_pointer();
-  imu_quat_    = imu_handle_->orientation_const_pointer();
 }
 
 void Walk::waiting() {
@@ -313,7 +262,6 @@ void Walk::hang_walk() {
     switch (internal_order_) {
       case 1:
         Isstand_stable = true;
-        foot_contact->clear();
         Loop_Count = 0;
         internal_order_=2;
         break;
@@ -335,17 +283,15 @@ void Walk::hang_walk() {
           // std::cout<<"flow_control: swing done"<<std::endl;
           test_tmp = 0;
           Loop_Count = 0;
-          for(int i=0;i<Leg_Num;i++)
-          {
+          for(int i=0;i<Leg_Num;i++) {
             support_legs_[swing_leg_] = true;
           }
-          foot_contact->clear();
 
           internal_order_ = 2;
 
           swing_leg_ = choice_next_leg(swing_leg_);
           // Leg_Order = (Leg_Order>1)?Leg_Order-2:3-Leg_Order;
-          std::cout<<"*******----case 4----*******"<<std::endl;
+          LOG_WARNING << "*******----case 4----*******";
         }
         break;
       default:
@@ -357,8 +303,8 @@ void Walk::hang_walk() {
 /*************************************************************************************************************/
 /*******************************************Loop: 100 Hz******************************************************/
 /*************************************************************************************************************/
-  printf("HEIGHT: %+02.04f %+02.04f %+02.04f %+02.04f\n",
-      Pos_ptr->lf.z, Pos_ptr->rf.z, Pos_ptr->lb.z, Pos_ptr->rb.z);
+  // printf("HEIGHT: %+02.04f %+02.04f %+02.04f %+02.04f\n",
+  //     Pos_ptr->lf.z, Pos_ptr->rf.z, Pos_ptr->lb.z, Pos_ptr->rb.z);
 
   //LOG_WARNING << "====================hang walk==========================";
   //printf("\n\n");
@@ -439,15 +385,17 @@ _Position Walk::get_CoG_adj_vec(const _Position& Next_Foothold, LegType leg) {
 void Walk::swing_leg(const LegType& leg) {
   EV3 foot_vel(0,0,0),joint_vel(0,0,0),joint_pos(0,0,0);
   _Position s = {0,0,0};
-  Leg_On_Ground = false;
+  LegState _td = LegState::AIR_STATE;
+  // Leg_On_Ground = false;
 
-  SupportLeg[Leg_Order1] = false;
+  SupportLeg[leg] = false;
 
   if(Loop_Count <= Swing_Num) {
     if(Loop_Count > Swing_Num/3*2) {
-      Leg_On_Ground = foot_contact->singleFootContactStatus(leg);
+      _td = leg_ifaces_[leg]->leg_state();
+      // Leg_On_Ground = foot_contact1->singleFootContactStatus(leg);
     }
-    if(!Leg_On_Ground) {
+    if (LegState::AIR_STATE == _td) {
       s = swing->compoundCycloidPosition(Pos_start, Desired_Foot_Pos, Loop_Count, Swing_Num, Swing_Height);
       // foot_vel = swing->compoundCycloidVelocity(Pos_start, Desired_Foot_Pos, Loop_Count, Swing_Num, Swing_Height);
 
@@ -477,37 +425,39 @@ void Walk::swing_leg(const LegType& leg) {
       cog_swing(s, leg);
     }
     //vel cal
-    if (LegType::FL == leg) {
-      joint_pos(0) = Angle_ptr->lf.pitch;
-      joint_pos(1) = Angle_ptr->lf.hip;
-      joint_pos(2) = Angle_ptr->lf.knee;
-    } else if (LegType::FR == leg)  {
-      joint_pos(0) = Angle_ptr->rf.pitch;
-      joint_pos(1) = Angle_ptr->rf.hip;
-      joint_pos(2) = Angle_ptr->rf.knee;
-    } else if (LegType::HL == leg)  {
-      joint_pos(0) = Angle_ptr->lb.pitch;
-      joint_pos(1) = Angle_ptr->lb.hip;
-      joint_pos(2) = Angle_ptr->lb.knee;
-    } else if (LegType::HR == leg)  {
-      joint_pos(0) = Angle_ptr->rb.pitch;
-      joint_pos(1) = Angle_ptr->rb.hip;
-      joint_pos(2) = Angle_ptr->rb.knee;
-    }
-
-    if(math->isJacobInvertible(joint_pos)) {
-      LOG_WARNING << "What fucking code!";
+//    if (LegType::FL == leg) {
+//      joint_pos(0) = Angle_ptr->lf.pitch;
+//      joint_pos(1) = Angle_ptr->lf.hip;
+//      joint_pos(2) = Angle_ptr->lf.knee;
+//    } else if (LegType::FR == leg)  {
+//      joint_pos(0) = Angle_ptr->rf.pitch;
+//      joint_pos(1) = Angle_ptr->rf.hip;
+//      joint_pos(2) = Angle_ptr->rf.knee;
+//    } else if (LegType::HL == leg)  {
+//      joint_pos(0) = Angle_ptr->lb.pitch;
+//      joint_pos(1) = Angle_ptr->lb.hip;
+//      joint_pos(2) = Angle_ptr->lb.knee;
+//    } else if (LegType::HR == leg)  {
+//      joint_pos(0) = Angle_ptr->rb.pitch;
+//      joint_pos(1) = Angle_ptr->rb.hip;
+//      joint_pos(2) = Angle_ptr->rb.knee;
+//    }
+//
+//    if(math->isJacobInvertible(joint_pos)) {
+//      LOG_WARNING << "What fucking code!";
 //      commands[3*Leg_Order].has_velocity_ = true;
 //      commands[3*Leg_Order+1].has_velocity_ = true;
 //      commands[3*Leg_Order+2].has_velocity_ = true;
-    }
+//    }
 //    joint_vel = math->footVelToJoint(joint_pos, foot_vel);
 //    commands[3*Leg_Order].velocity_ = joint_vel(2);
 //    commands[3*Leg_Order+1].velocity_ = joint_vel(1);
 //    commands[3*Leg_Order+2].velocity_ = joint_vel(0);
   } else {
-    Leg_On_Ground = foot_contact->singleFootContactStatus(leg);
-    if(!Leg_On_Ground) {
+    _td = leg_ifaces_[leg]->leg_state();
+    // Leg_On_Ground = foot_contact->singleFootContactStatus(leg);
+    // if(!Leg_On_Ground) {
+    if (LegState::AIR_STATE == _td) {
       on_ground(leg);
       std::cout << "ON ground_control is working" << std::endl;
     }
@@ -574,19 +524,19 @@ void Walk::walk() {
 /*************************************************************************************************************/
 /*******************************************Loop: 100 Hz******************************************************/
 /*************************************************************************************************************/
-  gesture->updateImuData(imu_quat_[0],imu_quat_[1],imu_quat_[2]);
+  // gesture->updateImuData(imu_quat_[0],imu_quat_[1],imu_quat_[2]);
   // gesture->printImuAngle();
 
-  foot_contact->footForceDataUpdate(td_handles_[0]->force_data(), td_handles_[1]->force_data(),
+  foot_contact1->footForceDataUpdate(td_handles_[0]->force_data(), td_handles_[1]->force_data(),
                                    td_handles_[2]->force_data(), td_handles_[3]->force_data());
-  foot_contact->printForce();
+  foot_contact1->printForce();
 
   if(Isstand_stable && !is_hang_walk_)//contact_control
   {
-    foot_contact->tdEventDetect();
-    foot_contact->printContactStatus();
+    foot_contact1->tdEventDetect();
+    foot_contact1->printContactStatus();
     // posture_keep();
-    All_on_ground = contact_keep(foot_contact->contactStatus());
+    All_on_ground = contact_keep(foot_contact1->contactStatus());
     // foot_contact->printForce();
     // std::cout<<"desired Height:"<<height[0]<<" "<<height[1]<<" "
     // <<height[2]<<" "<<height[3]<<" "<<std::endl;
@@ -609,10 +559,10 @@ void Walk::walk() {
       break;
     case 1:
       if(!is_hang_walk_) {
-        foot_contact->tdEventDetect();
+        foot_contact1->tdEventDetect();
         if(Loop_Count>3)
         {
-          Isstand_stable = stand_stable(foot_contact->contactStatus());
+          Isstand_stable = stand_stable(foot_contact1->contactStatus());
         }
         if(Isstand_stable)
         {
@@ -659,7 +609,7 @@ bool Walk::stand_stable(std::vector<bool> IsContact) {
   float h = 0, mean = 0, beta = 0.01;
 
   std::cout<<"stand stable:"<<IsContact[LF]<<" "<<IsContact[RF]<<" "<<IsContact[LB]<<" "<<IsContact[RB]<<std::endl;
-  foot_contact->printForce();
+  foot_contact1->printForce();
 
   if(IsContact[LF] && IsContact[RF] && IsContact[LB] &&IsContact[RB])
   {
@@ -682,16 +632,16 @@ bool Walk::stand_stable(std::vector<bool> IsContact) {
   {
     std::cout<<"phase two: make sure overall force are balanced"<<std::endl;
 
-    mean = (foot_contact->getForceData(LF) + foot_contact->getForceData(RF)
-           +foot_contact->getForceData(LB) + foot_contact->getForceData(RB))/4.0;
+    mean = (foot_contact1->getForceData(LF) + foot_contact1->getForceData(RF)
+           +foot_contact1->getForceData(LB) + foot_contact1->getForceData(RB))/4.0;
 
     for(int i=0;i<Leg_Num;i++)
     {
-      if(foot_contact->getForceData(i) < mean-t)
+      if(foot_contact1->getForceData(i) < mean-t)
       {
         height[i] -= beta;
       }
-      else if(foot_contact->getForceData(i) > mean+t)
+      else if(foot_contact1->getForceData(i) > mean+t)
       {
         height[i] += beta;
       }
@@ -743,9 +693,9 @@ bool Walk::stand_stable(std::vector<bool> IsContact) {
   //phase three: record force data
   if(phase == 4)
   {
-    foot_contact->setConst(foot_contact->getForceData(LF), foot_contact->getForceData(RF),
-           foot_contact->getForceData(LB), foot_contact->getForceData(RB));
-    foot_contact->printConst();
+    foot_contact1->setConst(foot_contact1->getForceData(LF), foot_contact1->getForceData(RF),
+           foot_contact1->getForceData(LB), foot_contact1->getForceData(RB));
+    foot_contact1->printConst();
     return true;
   }
   return false;
@@ -762,7 +712,7 @@ bool Walk::contact_keep(std::vector<bool> IsContact) {
     leg_count++;
     if(IsContact[LF]==false) {
       Pos_ptr->lf.z -= beta;
-    } else if(foot_contact->overDetect(LF)) {
+    } else if(foot_contact1->overDetect(LF)) {
       Pos_ptr->lf.z += beta;
     } else if(fabs(Pos_ptr->lf.z-height[LF]) > beta) {
       Pos_ptr->lf.z -= Sgn(Pos_ptr->lf.z-height[LF]) * beta;
@@ -775,7 +725,7 @@ bool Walk::contact_keep(std::vector<bool> IsContact) {
     leg_count++;
     if(IsContact[RF]==false) {
       Pos_ptr->rf.z -= beta;
-    } else if(foot_contact->overDetect(RF)) {
+    } else if(foot_contact1->overDetect(RF)) {
       Pos_ptr->rf.z += beta;
     } else if(fabs(Pos_ptr->rf.z-height[RF]) > beta) {
       Pos_ptr->rf.z -= Sgn(Pos_ptr->rf.z-height[RF]) * beta;
@@ -787,7 +737,7 @@ bool Walk::contact_keep(std::vector<bool> IsContact) {
     leg_count++;
     if(IsContact[LB]==false) {
       Pos_ptr->lb.z -= beta;
-    } else if(foot_contact->overDetect(LB)) {
+    } else if(foot_contact1->overDetect(LB)) {
       Pos_ptr->lb.z += beta;
     } else if(fabs(Pos_ptr->lb.z-height[LB]) > beta) {
       Pos_ptr->lb.z -= Sgn(Pos_ptr->lb.z-height[LB]) * beta;
@@ -800,7 +750,7 @@ bool Walk::contact_keep(std::vector<bool> IsContact) {
     leg_count++;
     if(IsContact[RB]==false) {
       Pos_ptr->rb.z -= beta;
-    } else if(foot_contact->overDetect(RB)) {
+    } else if(foot_contact1->overDetect(RB)) {
       Pos_ptr->rb.z += beta;
     } else if(fabs(Pos_ptr->rb.z-height[RB]) > beta) {
       Pos_ptr->rb.z -= Sgn(Pos_ptr->rb.z-height[RB]) * beta;
@@ -858,7 +808,7 @@ switch(timeorder)
   // if(Loop_Count>=30)
   if(Isstand_stable) 
   {
-    foot_contact->clear();    
+    foot_contact1->clear();
     Loop_Count = 0;
     // std::cout<<"Imu data calibration done!"<<std::endl;
     if(!is_hang_walk_)
@@ -899,7 +849,7 @@ switch(timeorder)
       SupportLeg[Leg_Order1] = true;
 
     }
-    foot_contact->clear();  
+    foot_contact1->clear();
 
     internal_order_ = 2;       
     // std::cout<<"Robot swing done! Please input 2 to continue:";
@@ -1113,7 +1063,7 @@ void Walk::swing_control1() {
 
   if(Loop_Count <= Swing_Num) {
     if(Loop_Count > Swing_Num/3*2) {
-      Leg_On_Ground = foot_contact->singleFootContactStatus1(Leg_Order1);
+      Leg_On_Ground = foot_contact1->singleFootContactStatus1(Leg_Order1);
     }
     if(!Leg_On_Ground) {
       s = swing->compoundCycloidPosition(Pos_start, Desired_Foot_Pos, Loop_Count, Swing_Num, Swing_Height);
@@ -1173,7 +1123,7 @@ void Walk::swing_control1() {
 //    commands[3*Leg_Order+1].velocity_ = joint_vel(1);
 //    commands[3*Leg_Order+2].velocity_ = joint_vel(0);
   } else {
-    Leg_On_Ground = foot_contact->singleFootContactStatus1(Leg_Order1);
+    Leg_On_Ground = foot_contact1->singleFootContactStatus1(Leg_Order1);
     if(!Leg_On_Ground) {
       on_ground_control1(Leg_Order1);
       std::cout << "ON ground_control is working" << std::endl;

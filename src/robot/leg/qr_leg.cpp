@@ -31,16 +31,24 @@ struct __PrivateParam
   }
 };
 
-QrLeg::QrLeg():params_(nullptr), state_leg_(INVALID_STATE),
-  td_threshold_(0)
+QrLeg::QrLeg()
+  : td_thres_(0), params_(nullptr)
 {
-  // TODO Auto-generated constructor stub
-  params_ = new __PrivateParam(getLabel());
+  ; // Nothing to do here.
 }
 
-QrLeg::~QrLeg() 
-{
-  // TODO Auto-generated destructor stub
+bool QrLeg::init() {
+  if (!RobotLeg::init()) return false;
+
+  auto cfg = MiiCfgReader::instance();
+  cfg->get_value(getLabel(), "td_threshold", td_thres_);
+
+  return true;
+}
+
+QrLeg::~QrLeg()  {
+  delete params_;
+  params_ = nullptr;
 }
 
 void QrLeg::followJntTrajectory(JntType jnt, const Trajectory1d _traj)  {
@@ -57,9 +65,6 @@ void QrLeg::followJntTrajectory(JntType jnt, const Trajectory1d _traj)  {
 
     std::this_thread::sleep_for(std::chrono::seconds(4));
   }
-
-
-
 }
 
 void QrLeg::followJntTrajectory(const Trajectory3d) {
@@ -71,12 +76,15 @@ void QrLeg::followEefTrajectory(const Trajectory3d)
   LOG_ERROR << "Call the 'followJntTrajectory' which has does not complemented.";
 }
 
-LegState QrLeg::leg_state()  {
-  return state_leg_;
+void QrLeg::setForceThreshold(double threshold) {
+  td_thres_ = threshold;
 }
 
-void QrLeg::printDH()
-{
+LegState QrLeg::leg_state()  {
+  return (foot_force() > td_thres_) ? LegState::TD_STATE : LegState::AIR_STATE;
+}
+
+void QrLeg::printDH() {
   LOG_INFO << "Axis No. /"<<"a(i-1) /"<<"alpha(i-1) /"<<"di /"<<"Joint Vars";
   LOG_INFO << "1    "<<"0    "<<"0    "<<"0   "<<"Theta_0";
   LOG_INFO << "2    "<<"L0   "<<"PI/2 "<<"0   "<<"Theta_1";
@@ -181,40 +189,6 @@ EV3 QrLeg::getKneePostion(const EV3& a)
   return result;
 }
 
-void QrLeg::setTouchdownThreshold(const double& threshold)
-{
-  td_threshold_ = threshold;
-}
-
-void QrLeg::touchDownDetect()
-{  
-  if(foot_force() > td_threshold_)
-  {    
-    state_leg_ = TD_STATE;   
-  }
-}
-void QrLeg::touchDownConditionDetect()
-{  
-  if(state_leg_ != TD_STATE && foot_force() > td_threshold_)
-  {    
-    state_leg_ = TD_STATE;   
-  }
-}
-
-void QrLeg::liftDetect()
-{  
-  if(foot_force() < td_threshold_)
-  {    
-    state_leg_ = AIR_STATE;   
-  }
-}
-void QrLeg::liftConditionDetect()
-{  
-  if(state_leg_ != AIR_STATE && foot_force() < td_threshold_)
-  {    
-    state_leg_ = AIR_STATE;   
-  }
-}
 
 /*  
 Description: calculating forward kinematics for 3 DOF leg using D-H methods
