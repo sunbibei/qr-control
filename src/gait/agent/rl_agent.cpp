@@ -14,7 +14,7 @@ namespace qr_control {
 
 RLAgent::RLAgent(const MiiString& _l)
   : GaitBase(_l), rl_agent::RobotPlugin2(_l),
-    gain_(1.0),
+    gain_(1.0), is_send_(false),
     /*current_state_(AGENT_STATE::UNKONWN_RL_STATE),*/
     state_machine_(nullptr),
     trial_leg_ifaces_(nullptr) {
@@ -105,10 +105,10 @@ void RLAgent::checkState() {
       current_state_ = AGENT_STATE::RL_STATE_NOTHING;
     }
 
-    printf("JOINT TARGET: {YAW: %+01.04f HIP: %+01.04f KNEE: %+01.04f}\n",
+    printf(" = YAW: %+01.04f HIP: %+01.04f KNEE: %+01.04f\n",
         target_X_pos_(JntType::YAW), target_X_pos_(JntType::HIP), target_X_pos_(JntType::KNEE));
 
-    printf("JOINT ANGLES: {YAW: %+01.04f HIP: %+01.04f KNEE: %+01.04f ERROR: %+01.04f VEL: %+01.04f}\n",
+    printf(" | YAW: %+01.04f HIP: %+01.04f KNEE: %+01.04f ERROR: %+01.04f VEL: %+01.04f\n",
         X_(JntType::YAW), X_(JntType::HIP), X_(JntType::KNEE), error, vel);
 
     /*std::cout << "The current joint velocities: " << std::endl;
@@ -134,11 +134,18 @@ void RLAgent::checkState() {
 
 ///! RL_STATE_NOTHING callback
 void RLAgent::nothing() {
-  ;
+  // Eigen::VectorXd _dx;
+  samples_->getData(gps::JOINT_VELOCITIES, dX_, 0);
+  if (dX_.norm() > 0.1) {
+    U_.fill(0.0);
+    trial_leg_ifaces_->legTarget(JntCmdType::CMD_MOTOR_VEL, U_);
+    trial_leg_ifaces_->move();
+  }
 }
 
 ///! RL_STATE_RESET callback
 void RLAgent::reset() {
+  if (is_send_) return;
   if (JntType::N_JNTS != target_X_pos_.size()) {
     LOG_ERROR << "Something is wrong, the size of target joints is not match "
         << "between with leg " << trial_leg_ifaces_->leg_type();
@@ -151,6 +158,7 @@ void RLAgent::reset() {
 //    trial_leg_ifaces_->jointTarget(t, JntCmdType::CMD_POS, target_X_pos_(t));
 
   trial_leg_ifaces_->move();
+  is_send_ = true;
 }
 
 ///! RL_STATE_TRIAL callback
@@ -186,6 +194,7 @@ void RLAgent::trial() {
 
 // Position command callback.
 void RLAgent::resetSubCb(const rl_msgs::PositionCommand::ConstPtr& msg) {
+  current_state_ = AGENT_STATE::RL_STATE_NOTHING;
   LOG_INFO << "received position command";
 
   if (JntType::N_JNTS != msg->data.size())
@@ -200,6 +209,7 @@ void RLAgent::resetSubCb(const rl_msgs::PositionCommand::ConstPtr& msg) {
   }
   std::cout << std::endl;
 
+  is_send_           = false;
   is_report_waiting_ = true;
   LOG_INFO << "Turn State to RESET";
   current_state_ = AGENT_STATE::RL_STATE_RESET;
@@ -207,6 +217,7 @@ void RLAgent::resetSubCb(const rl_msgs::PositionCommand::ConstPtr& msg) {
 
 // Trial command callback.
 void RLAgent::trialSubCb(const rl_msgs::TrialCommand::ConstPtr& msg) {
+  current_state_ = AGENT_STATE::RL_STATE_NOTHING;
   LOG_INFO << "received trial command";
 
   rl_agent::CtrlConfigMap controller_params;

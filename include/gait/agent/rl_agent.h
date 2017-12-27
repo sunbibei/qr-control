@@ -50,6 +50,8 @@ protected:
   Eigen::VectorXd dX_;
   ///! The command gain
   double          gain_;
+  ///! Whether the reset command is send
+  bool            is_send_; 
 
 protected:
   ///! The state machine corresponds with CreepState for creep
