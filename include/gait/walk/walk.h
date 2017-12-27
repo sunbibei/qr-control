@@ -63,6 +63,24 @@ protected:
 private:
   middleware::Timer*    timer_;
   bool                  is_send_init_cmds_;
+  ///! The internal flag
+  unsigned int          internal_order_;
+  ///! The current swing leg
+  LegType               swing_leg_;
+  ///! The leg whether stand flag
+  bool                  support_legs_[LegType::N_LEGS];
+
+  ///! These variables need to delete!
+  std::vector<middleware::ForceSensor*>       td_handles_;
+  middleware::ImuSensor*                      imu_handle_;
+
+  const double*                  imu_ang_vel_;
+  const double*                  imu_lin_acc_;
+  const double*                  imu_quat_;
+
+  std::vector<const double*>     jnt_poss_;
+  std::vector<const double*>     jnt_vels_;
+  std::vector<const double*>     jnt_tors_;
 
 ///! These methods are the callback method for WalkState.
 private:
@@ -76,21 +94,31 @@ private:
   void hang_walk();
 
 private:
+  ///! Choice the next swing leg @next by @curr LegType.
+  LegType choice_next_leg(const LegType curr);
+  void    next_foot_pt();
+  void    move_cog();
+  void    swing_leg(const LegType&);
+  void    on_ground(const LegType&);
+  void    cog_swing(const _Position&, const LegType&);
+  _Position    get_CoG_adj_vec(const _Position&, LegType);
+
+private:
   void __initAllofData();
 
   void update_shoulder_pos(float pitch,float yaw,float roll);
   void forward_kinematics();
   void reverse_kinematics();
 
-  void cog_adj();
-  void flow_control(int timeorder);
+  void cog_adj1();
+  void flow_control1(int timeorder);
   void cog_pos_assign(_Position Adj);
-  void cog_swing_assign(_Position Adj, int legId);
+  void cog_swing_assign1(_Position Adj, int legId);
 
-  void swing_control();
+  void swing_control1();
   void hardware_delay_test();
-  void assign_next_foot();
-  void on_ground_control(int legId);
+  void assign_next_foot1();
+  void on_ground_control1(int legId);
 
   void command_assign(Angle_Ptr Angle);
   void print_command();
@@ -106,7 +134,7 @@ private:
   _Position innerTriangle(const _Position &A, const _Position &B, const _Position &C);
   _Position get_stance_velocity(_Position Adj_vec, unsigned int Loop);
 
-  _Position get_CoG_adj_vec(const _Position &Next_Foothold, unsigned int Swing_Order);
+  _Position get_CoG_adj_vec1(const _Position &Next_Foothold, unsigned int Swing_Order);
 
 protected:
   float test_tmp;
@@ -127,8 +155,8 @@ private:
   int Switch = 0;
   int count_loop = 0;
   bool Leg_On_Ground = 0;
-  unsigned int Time_Order = 0;
-  unsigned int Leg_Order = 2;
+
+  unsigned int Leg_Order1 = 2;
   double Init_Pos[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
   // Angle Angle_Group = {{0,0,-0.547},{0,0,-0.547},{0,0,0.547},{0,0,0.547}};
   Angle Angle_Group = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
@@ -151,17 +179,6 @@ private:
   _Position Desired_Foot_Pos = {0,0,0};
   _Position Pos_start,Cog_adj;
   _Position swing_adj_CoG;
-
-  std::vector<middleware::ForceSensor*>       td_handles_;
-  middleware::ImuSensor*                      imu_handle_;
-
-  const double*                  imu_ang_vel_;
-  const double*                  imu_lin_acc_;
-  const double*                  imu_quat_;
-
-  std::vector<const double*>     jnt_poss_;
-  std::vector<const double*>     jnt_vels_;
-  std::vector<const double*>     jnt_tors_;
 };
 
 } /* namespace qr_control */

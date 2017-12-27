@@ -41,7 +41,9 @@ void __print_command(const LegTarget*);
 Walk::Walk()
   : current_state_(WalkState::UNKNOWN_WK_STATE),
     state_machine_(nullptr), is_hang_walk_(false),
-    timer_(nullptr), is_send_init_cmds_(false)
+    /* These variables are the private. */
+    timer_(nullptr), is_send_init_cmds_(false),
+    internal_order_(0), swing_leg_(LegType::HL)
 {
   for (auto& iface : leg_ifaces_)
     iface = nullptr;
@@ -181,7 +183,7 @@ void Walk::checkState() {
     LOG_WARNING << "The robot has reached the initialization pose, input any key to continue";
     getchar();
 
-    Time_Order = 1;
+    internal_order_ = 1;
     break;
   }
   case WalkState::WK_SWING:
@@ -292,34 +294,41 @@ void Walk::pose_init() {
 
 }
 
+LegType Walk::choice_next_leg(const LegType curr) {
+  switch (curr) {
+  case LegType::FL: return LegType::HR;
+  case LegType::FR: return LegType::HL;
+  case LegType::HL: return LegType::FL;
+  case LegType::HR: return LegType::FR;
+  default: return LegType::UNKNOWN_LEG;
+  }
+}
+
 void Walk::hang_walk() {
   //LOG_WARNING << "--------------------hang walk--------------------------";
   count_loop++;
   if (count_loop > 5) {
     count_loop = 0;
 
-    switch (Time_Order) {
+    switch (internal_order_) {
       case 1:
         Isstand_stable = true;
         foot_contact->clear();
         Loop_Count = 0;
-        Time_Order=2;
+        internal_order_=2;
         break;
       case 2:
-        cog_adj();
+        move_cog();
         if(Loop_Count>=Stance_Num)
         {
           Loop_Count = 0;
-          // std::cout<<"flow_control: cog done"<<std::endl;
-          Time_Order=3;
-          // std::cout<<"Robot moving CoG! Please input 3 to continue:";
-          // std::cin>>Time_Order;
-          assign_next_foot();
+          internal_order_=3;
+          next_foot_pt();
           LOG_WARNING << "*******----case 3----*******";
         }
         break;
-      case 3://swing leg
-        swing_control();
+      case 3: //swing leg
+        swing_leg(swing_leg_);
         if((Leg_On_Ground && !is_hang_walk_) || (Loop_Count>=Swing_Num && is_hang_walk_))
         // if(Loop_Count>=Swing_Num)
         {
@@ -328,14 +337,14 @@ void Walk::hang_walk() {
           Loop_Count = 0;
           for(int i=0;i<Leg_Num;i++)
           {
-            SupportLeg[Leg_Order] = true;
+            support_legs_[swing_leg_] = true;
           }
           foot_contact->clear();
 
-          Time_Order = 2;
-          // std::cout<<"Robot swing done! Please input 2 to continue:";
-          // std::cin>>Time_Order;
-          Leg_Order = (Leg_Order>1)?Leg_Order-2:3-Leg_Order;
+          internal_order_ = 2;
+
+          swing_leg_ = choice_next_leg(swing_leg_);
+          // Leg_Order = (Leg_Order>1)?Leg_Order-2:3-Leg_Order;
           std::cout<<"*******----case 4----*******"<<std::endl;
         }
         break;
@@ -356,7 +365,211 @@ void Walk::hang_walk() {
   // LOG_INFO << "Loop time used: " << timer_->dt() << " ms.";
 }
 
+void Walk::next_foot_pt() {
+  switch(swing_leg_)
+  {
+    case LegType::FL:
+      Pos_start = Pos_ptr->lf;
+      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, height[LF]);
+      break;
+    case LegType::FR:
+      Pos_start = Pos_ptr->rf;
+      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, height[RF]);
+      break;
+    case LegType::HL:
+      Pos_start = Pos_ptr->lb;
+      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, height[LB]);
+      break;
+    case LegType::HR:
+      Pos_start = Pos_ptr->rb;
+      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, height[RB]);
+      break;
+    default:break;
+  }
+}
 
+void Walk::move_cog() {
+  _Position adj = {0,0,0};
+
+  if (Loop_Count <= 1)
+  {
+    Cog_adj = get_CoG_adj_vec(Desired_Foot_Pos, swing_leg_);
+    // std::cout<<"CoG adjust vector:"<<Cog_adj.x<<", "<<Cog_adj.y<<std::endl;
+    if ((LegType::FL == swing_leg_) || (LegType::FR == swing_leg_))
+      Stance_Num = 1;
+    else
+      Stance_Num = 50;
+  }
+
+  adj = get_stance_velocity(Cog_adj, Loop_Count);
+  // std::cout<<"cog_adj h_adj_step:";
+
+
+  cog_pos_assign(adj);
+  reverse_kinematics();
+  // std::cout<<"cog_adj after: Pos_ptr.z:"<<Pos_ptr->lf.z<<" "<<Pos_ptr->rf.z<<" "<<Pos_ptr->lb.z<<" "<<Pos_ptr->rb.z<<" "<<std::endl;
+}
+
+_Position Walk::get_CoG_adj_vec(const _Position& Next_Foothold, LegType leg) {
+  _Position crosspoint;
+  switch (leg)
+  {
+    case LegType::FL:
+    case LegType::HL:
+      crosspoint = math->getCrossPoint(Pos_ptr->lf+gesture->getSingleShoulderPos(LF),
+          Pos_ptr->rb+gesture->getSingleShoulderPos(RB),
+          Pos_ptr->rf+gesture->getSingleShoulderPos(RF),
+          Pos_ptr->lb+gesture->getSingleShoulderPos(LB));
+      return innerTriangle(crosspoint,
+          Pos_ptr->rf+gesture->getSingleShoulderPos(RF),
+          Pos_ptr->rb+gesture->getSingleShoulderPos(RB));
+    case LegType::FR:
+    case LegType::HR:
+      crosspoint = math->getCrossPoint(
+          Pos_ptr->rf+gesture->getSingleShoulderPos(RF),
+          Pos_ptr->lb+gesture->getSingleShoulderPos(LB),
+          Pos_ptr->lf+gesture->getSingleShoulderPos(LF),
+          Pos_ptr->rb+gesture->getSingleShoulderPos(RB));
+      return innerTriangle(crosspoint,
+          Pos_ptr->lf+gesture->getSingleShoulderPos(LF),
+          Pos_ptr->lb+gesture->getSingleShoulderPos(LB));
+  }
+}
+
+void Walk::swing_leg(const LegType& leg) {
+  EV3 foot_vel(0,0,0),joint_vel(0,0,0),joint_pos(0,0,0);
+  _Position s = {0,0,0};
+  Leg_On_Ground = false;
+
+  SupportLeg[Leg_Order1] = false;
+
+  if(Loop_Count <= Swing_Num) {
+    if(Loop_Count > Swing_Num/3*2) {
+      Leg_On_Ground = foot_contact->singleFootContactStatus(leg);
+    }
+    if(!Leg_On_Ground) {
+      s = swing->compoundCycloidPosition(Pos_start, Desired_Foot_Pos, Loop_Count, Swing_Num, Swing_Height);
+      // foot_vel = swing->compoundCycloidVelocity(Pos_start, Desired_Foot_Pos, Loop_Count, Swing_Num, Swing_Height);
+
+      switch(leg)
+      {
+        case LegType::FL:
+          Pos_ptr->lf = Pos_start + s;
+        break;
+        case LegType::FR:
+          Pos_ptr->rf = Pos_start + s;
+        break;
+        case LegType::HL:
+          Pos_ptr->lb = Pos_start + s;
+        break;
+        case LegType::HR:
+          Pos_ptr->rb = Pos_start + s;
+        break;
+        default:break;
+      }
+    }
+
+    // cog moving
+    if(Loop_Count<=Swing_Num/3*2)
+    {
+      Stance_Num = Swing_Num/3*2;
+      s = get_stance_velocity(swing_adj_CoG, Loop_Count);
+      cog_swing(s, leg);
+    }
+    //vel cal
+    if (LegType::FL == leg) {
+      joint_pos(0) = Angle_ptr->lf.pitch;
+      joint_pos(1) = Angle_ptr->lf.hip;
+      joint_pos(2) = Angle_ptr->lf.knee;
+    } else if (LegType::FR == leg)  {
+      joint_pos(0) = Angle_ptr->rf.pitch;
+      joint_pos(1) = Angle_ptr->rf.hip;
+      joint_pos(2) = Angle_ptr->rf.knee;
+    } else if (LegType::HL == leg)  {
+      joint_pos(0) = Angle_ptr->lb.pitch;
+      joint_pos(1) = Angle_ptr->lb.hip;
+      joint_pos(2) = Angle_ptr->lb.knee;
+    } else if (LegType::HR == leg)  {
+      joint_pos(0) = Angle_ptr->rb.pitch;
+      joint_pos(1) = Angle_ptr->rb.hip;
+      joint_pos(2) = Angle_ptr->rb.knee;
+    }
+
+    if(math->isJacobInvertible(joint_pos)) {
+      LOG_WARNING << "What fucking code!";
+//      commands[3*Leg_Order].has_velocity_ = true;
+//      commands[3*Leg_Order+1].has_velocity_ = true;
+//      commands[3*Leg_Order+2].has_velocity_ = true;
+    }
+//    joint_vel = math->footVelToJoint(joint_pos, foot_vel);
+//    commands[3*Leg_Order].velocity_ = joint_vel(2);
+//    commands[3*Leg_Order+1].velocity_ = joint_vel(1);
+//    commands[3*Leg_Order+2].velocity_ = joint_vel(0);
+  } else {
+    Leg_On_Ground = foot_contact->singleFootContactStatus(leg);
+    if(!Leg_On_Ground) {
+      on_ground(leg);
+      std::cout << "ON ground_control is working" << std::endl;
+    }
+  }
+  reverse_kinematics();
+}
+
+void Walk::on_ground(const LegType& l) {
+  double err = 0.1;
+  switch (l)
+  {
+  case LegType::FL:
+    Pos_ptr->lf.z = Pos_ptr->lf.z - err;
+    Angle_ptr->lf = math->cal_kinematics(Pos_ptr->lf,-1);
+    break;
+  case LegType::FR:
+    Pos_ptr->rf.z = Pos_ptr->rf.z - err;
+    Angle_ptr->rf = math->cal_kinematics(Pos_ptr->rf,-1);
+    break;
+  case LegType::HL:
+    Pos_ptr->lb.z = Pos_ptr->lb.z - err;
+    Angle_ptr->lb = math->cal_kinematics(Pos_ptr->lb, 1);
+    break;
+  case LegType::HR:
+    Pos_ptr->rb.z = Pos_ptr->rb.z - err;
+    Angle_ptr->rb = math->cal_kinematics(Pos_ptr->rb, 1);
+    break;
+  default:
+    LOG_ERROR << "What fucking LEG";
+  }
+}
+
+void Walk::cog_swing(const _Position& Adj, const LegType& leg) {
+  switch(leg)
+  {
+    case LegType::FL:
+      Pos_ptr->rf = Pos_ptr->rf - Adj;
+      Pos_ptr->lb = Pos_ptr->lb - Adj;
+      Pos_ptr->rb = Pos_ptr->rb - Adj;
+      break;
+    case LegType::FR:
+      Pos_ptr->lf = Pos_ptr->lf - Adj;
+      Pos_ptr->lb = Pos_ptr->lb - Adj;
+      Pos_ptr->rb = Pos_ptr->rb - Adj;
+      break;
+    case LegType::HL:
+      Pos_ptr->lf = Pos_ptr->lf - Adj;
+      Pos_ptr->rf = Pos_ptr->rf - Adj;
+      Pos_ptr->rb = Pos_ptr->rb - Adj;
+      break;
+    case LegType::HR:
+      Pos_ptr->lf = Pos_ptr->lf - Adj;
+      Pos_ptr->rf = Pos_ptr->rf - Adj;
+      Pos_ptr->lb = Pos_ptr->lb - Adj;
+      break;
+    default:break;
+  }
+}
+
+/*************************************************************************************************************/
+/*******************************************  OLD CODE  ******************************************************/
+/*************************************************************************************************************/
 void Walk::walk() {
 /*************************************************************************************************************/
 /*******************************************Loop: 100 Hz******************************************************/
@@ -388,11 +601,11 @@ void Walk::walk() {
   if(count_loop>5) {
   count_loop = 0;
 
-  switch (Time_Order)
+  switch (internal_order_)
   {
     case 0: //init gesture
       pose_init();
-      flow_control(Time_Order);
+      flow_control1(internal_order_);
       break;
     case 1:
       if(!is_hang_walk_) {
@@ -408,15 +621,15 @@ void Walk::walk() {
       } else {
         Isstand_stable = true;
       }
-      flow_control(Time_Order);
+      flow_control1(internal_order_);
       break;
     case 2:
-      cog_adj();
-      flow_control(Time_Order);
+      cog_adj1();
+      flow_control1(internal_order_);
       break;
     case 3://swing leg
-      swing_control();
-      flow_control(Time_Order);
+      swing_control1();
+      flow_control1(internal_order_);
       break;
     default:
       LOG_ERROR << "What fucking control!";
@@ -627,7 +840,7 @@ float result = Kp*err_pos + Kd*d_vel - Kv*f_vel;
 return d_pos;
 }
 
-void Walk::flow_control(int timeorder)
+void Walk::flow_control1(int timeorder)
 {
 switch(timeorder)
 {
@@ -636,7 +849,7 @@ switch(timeorder)
   {
     Loop_Count = 0;
     std::cout<<"Robot has been initialized! Please input 1 to continue:";
-    std::cin>>Time_Order;
+    std::cin>>internal_order_;
     // Time_Order=1;
   }
   break;
@@ -651,11 +864,11 @@ switch(timeorder)
     if(!is_hang_walk_)
     {
       std::cout<<"Robot has stand stable! Please input 2 to continue:"; 
-      std::cin>>Time_Order; 
+      std::cin>>internal_order_; 
     }
     else
     {
-      Time_Order=2;
+      internal_order_=2;
     } 
   }
   break;
@@ -665,10 +878,10 @@ switch(timeorder)
   {
     Loop_Count = 0;
     // std::cout<<"flow_control: cog done"<<std::endl;
-    Time_Order=3;
+    internal_order_=3;
     // std::cout<<"Robot moving CoG! Please input 3 to continue:";
     // std::cin>>Time_Order;
-    assign_next_foot();
+    assign_next_foot1();
     std::cout<<"*******-----------------------------------case 3---------------------------------------*******"<<std::endl;
 
   }
@@ -683,14 +896,15 @@ switch(timeorder)
     Loop_Count = 0;
     for(int i=0;i<Leg_Num;i++)
     {
-      SupportLeg[Leg_Order] = true;
+      SupportLeg[Leg_Order1] = true;
+
     }
     foot_contact->clear();  
 
-    Time_Order = 2;       
+    internal_order_ = 2;       
     // std::cout<<"Robot swing done! Please input 2 to continue:";
     // std::cin>>Time_Order;      
-    Leg_Order = (Leg_Order>1)?Leg_Order-2:3-Leg_Order;    
+    Leg_Order1 = (Leg_Order1>1)?Leg_Order1-2:3-Leg_Order1;
     std::cout<<"*******-----------------------------------case 4----------------------------------------*******"<<std::endl;
   }       
   break;
@@ -717,7 +931,7 @@ switch(timeorder)
  Description: Ensure the foot is on ground by recursive decreasing height
  Input: lf,rf,lb,rb corresponding to 0,1,2,3
 **************************************************************************/
-void Walk::on_ground_control(int legId)
+void Walk::on_ground_control1(int legId)
 {
 double err = 0.1;
 switch (legId)
@@ -827,7 +1041,7 @@ else
  Input: four feet(end effector) position(x,y,z),Swing leg order and next Swing leg position
  Output: CoG adjust vector
 **************************************************************************/
-_Position Walk::get_CoG_adj_vec(const _Position &Next_Foothold, unsigned int Swing_Order)
+_Position Walk::get_CoG_adj_vec1(const _Position &Next_Foothold, unsigned int Swing_Order)
 {
 _Position crosspoint;
 switch (Swing_Order)
@@ -844,9 +1058,9 @@ switch (Swing_Order)
 }
 }
 
-void Walk::assign_next_foot()
+void Walk::assign_next_foot1()
 {
-switch(Leg_Order)
+switch(Leg_Order1)
 {
   case LF:
   Pos_start = Pos_ptr->lf;
@@ -868,16 +1082,16 @@ switch(Leg_Order)
 }
 }
 
-void Walk::cog_adj()
+void Walk::cog_adj1()
 {
 // Switch = 1;
 _Position adj = {0,0,0};
 
 if(Loop_Count<=1)
 {
-  Cog_adj = get_CoG_adj_vec(Desired_Foot_Pos, Leg_Order);
+  Cog_adj = get_CoG_adj_vec1(Desired_Foot_Pos, Leg_Order1);
   // std::cout<<"CoG adjust vector:"<<Cog_adj.x<<", "<<Cog_adj.y<<std::endl;
-  Stance_Num = (Leg_Order<2) ? 1:50;
+  Stance_Num = (Leg_Order1<2) ? 1:50;
 }
 
 adj = get_stance_velocity(Cog_adj, Loop_Count);
@@ -890,22 +1104,22 @@ reverse_kinematics();
 
 }
 
-void Walk::swing_control() {
+void Walk::swing_control1() {
   EV3 foot_vel(0,0,0),joint_vel(0,0,0),joint_pos(0,0,0);
   _Position s = {0,0,0};
   Leg_On_Ground = false;
 
-  SupportLeg[Leg_Order] = false;
+  SupportLeg[Leg_Order1] = false;
 
   if(Loop_Count <= Swing_Num) {
     if(Loop_Count > Swing_Num/3*2) {
-      Leg_On_Ground = foot_contact->singleFootContactStatus(Leg_Order);
+      Leg_On_Ground = foot_contact->singleFootContactStatus1(Leg_Order1);
     }
     if(!Leg_On_Ground) {
       s = swing->compoundCycloidPosition(Pos_start, Desired_Foot_Pos, Loop_Count, Swing_Num, Swing_Height);
       // foot_vel = swing->compoundCycloidVelocity(Pos_start, Desired_Foot_Pos, Loop_Count, Swing_Num, Swing_Height);
 
-      switch(Leg_Order)
+      switch(Leg_Order1)
       {
         case LF:
           Pos_ptr->lf = Pos_start + s;
@@ -927,22 +1141,22 @@ void Walk::swing_control() {
     {
       Stance_Num = Swing_Num/3*2;
       s = get_stance_velocity(swing_adj_CoG, Loop_Count);
-      cog_swing_assign(s, Leg_Order);
+      cog_swing_assign1(s, Leg_Order1);
     }
     //vel cal
-    if(Leg_Order==LF) {
+    if(Leg_Order1==LF) {
       joint_pos(0) = Angle_ptr->lf.pitch;
       joint_pos(1) = Angle_ptr->lf.hip;
       joint_pos(2) = Angle_ptr->lf.knee;
-    } else if(Leg_Order==RF) {
+    } else if(Leg_Order1==RF) {
       joint_pos(0) = Angle_ptr->rf.pitch;
       joint_pos(1) = Angle_ptr->rf.hip;
       joint_pos(2) = Angle_ptr->rf.knee;
-    } else if(Leg_Order==LB) {
+    } else if(Leg_Order1==LB) {
       joint_pos(0) = Angle_ptr->lb.pitch;
       joint_pos(1) = Angle_ptr->lb.hip;
       joint_pos(2) = Angle_ptr->lb.knee;
-    } else if(Leg_Order==RB) {
+    } else if(Leg_Order1==RB) {
       joint_pos(0) = Angle_ptr->rb.pitch;
       joint_pos(1) = Angle_ptr->rb.hip;
       joint_pos(2) = Angle_ptr->rb.knee;
@@ -959,9 +1173,9 @@ void Walk::swing_control() {
 //    commands[3*Leg_Order+1].velocity_ = joint_vel(1);
 //    commands[3*Leg_Order+2].velocity_ = joint_vel(0);
   } else {
-    Leg_On_Ground = foot_contact->singleFootContactStatus(Leg_Order);
+    Leg_On_Ground = foot_contact->singleFootContactStatus1(Leg_Order1);
     if(!Leg_On_Ground) {
-      on_ground_control(Leg_Order);
+      on_ground_control1(Leg_Order1);
       std::cout << "ON ground_control is working" << std::endl;
     }
   }
@@ -975,8 +1189,8 @@ void Walk::cog_pos_assign(_Position Adj) {
   Pos_ptr->rb = Pos_ptr->rb - Adj;
 }
 
-void Walk::cog_swing_assign(_Position Adj, int legId) {
-  switch(Leg_Order) {
+void Walk::cog_swing_assign1(_Position Adj, int legId) {
+  switch(Leg_Order1) {
     case LF:
       Pos_ptr->rf = Pos_ptr->rf - Adj;
       Pos_ptr->lb = Pos_ptr->lb - Adj;

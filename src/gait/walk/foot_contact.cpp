@@ -133,7 +133,7 @@ bool FootContact::isLegOnGround()
 	return leg_on_ground;
 }
 
-ContactStatus FootContact::singleFootContactStatus(int legId)
+ContactStatus FootContact::singleFootContactStatus1(int legId)
 {
 	switch(legId)
 	{
@@ -146,6 +146,21 @@ ContactStatus FootContact::singleFootContactStatus(int legId)
 		case RB:
 			return rb_contact_status;
 	}	
+}
+
+ContactStatus FootContact::singleFootContactStatus(const LegType& l)
+{
+  switch(l)
+  {
+    case LegType::FL:
+      return lf_contact_status;
+    case LegType::FR:
+      return rf_contact_status;
+    case LegType::HL:
+      return lb_contact_status;
+    case LegType::HR:
+      return rb_contact_status;
+  }
 }
 
 std::vector<bool> FootContact::contactStatus()

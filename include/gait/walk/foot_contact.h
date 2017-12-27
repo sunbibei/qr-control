@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "ultility.h"
+#include <foundation/utf.h>
 
 enum ContactStatus {None=0, Deep};
 
@@ -60,7 +61,8 @@ namespace qr_control {
 		void printContactStatus();
 
 		bool isLegOnGround();
-		ContactStatus singleFootContactStatus(int legId);
+		ContactStatus singleFootContactStatus1(int legId);
+		ContactStatus singleFootContactStatus(const LegType&);
 		std::vector<bool> contactStatus();
 		
 	};
