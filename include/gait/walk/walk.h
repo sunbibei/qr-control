@@ -9,6 +9,8 @@
 #define INCLUDE_GAIT_WALK_WALK_H_
 
 #include "gait/gait_base.h"
+#include "robot/leg/qr_leg.h"
+
 #include "ultility.h"
 #include "foot_contact.h"
 #include "swing.h"
@@ -47,15 +49,19 @@ protected:
   ///! The state machine corresponds with CreepState for creep
   StateMachine<WalkState>*   state_machine_;
 
+  ///! The interface for legs
+  QrLeg*          leg_ifaces_[LegType::N_LEGS];
+  ///! The commands of legs.
+  LegTarget       leg_cmds_[LegType::N_LEGS];
+
 private:
-  middleware::Timer*         timer_;
+  middleware::Timer*    timer_;
 
 private:
   void update();
 
   void __initAllofData();
 
-  void state_transfer();
   void update_shoulder_pos(float pitch,float yaw,float roll);
   void forward_kinematics();
   void reverse_kinematics();
@@ -69,14 +75,8 @@ private:
   void hardware_delay_test();
   void assign_next_foot();
   void on_ground_control(int legId);
-  void cog_adj_backward();
-  void flow_control_backward(int timeorder);
-  void assign_next_foot_backward();
-  void assign_next_foot_turn();
-  void flow_control_turn(int timeorder);
-  void cog_adj_turn();
+
   void command_assign(Angle_Ptr Angle);
-  void command_init();
   void print_command();
 
   bool stand_stable(std::vector<bool> IsContact);
@@ -89,7 +89,6 @@ private:
 
   _Position innerTriangle(const _Position &A, const _Position &B, const _Position &C);
   _Position get_stance_velocity(_Position Adj_vec, unsigned int Loop);
-  float get_stance_velocity(float adj, unsigned int Loop);
 
   _Position get_CoG_adj_vec(const _Position &Next_Foothold, unsigned int Swing_Order);
 
@@ -105,7 +104,6 @@ protected:
 
   Quartic Height;
 
-  std::vector< std::string > joint_names_;
   // std_msgs::Float64MultiArray msg;
   // boost::scoped_ptr<realtime_tools::RealtimePublisher<std_msgs::Float64MultiArray>> joint_state_publisher_;
 private:
@@ -131,14 +129,14 @@ private:
   std::vector<float> height;
   std::vector<bool> SupportLeg;
 
-  std::vector<Commands> commands;
+  // std::vector<Commands> commands;
+
   Angle_Ptr Angle_ptr = &Angle_Group;
   Position_Ptr Pos_ptr = &Foot_Position_Group;
   _Position Desired_Foot_Pos = {0,0,0};
   _Position Pos_start,Cog_adj;
   _Position swing_adj_CoG;
 
-  std::vector<middleware::Joint*>             joint_handles_;
   std::vector<middleware::ForceSensor*>       td_handles_;
   middleware::ImuSensor*                      imu_handle_;
 
