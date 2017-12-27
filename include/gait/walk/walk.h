@@ -101,6 +101,7 @@ protected:
   Swing* swing;
   Math* math;
   Gesture* gesture;
+  bool HangUpWalk;
 
   Quartic Height;
 

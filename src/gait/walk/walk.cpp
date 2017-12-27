@@ -96,6 +96,7 @@ bool Walk::init() {
 
   Isstand_stable = false;
   All_on_ground = false;
+  HangUpWalk = true;
 
   timer_ = new middleware::Timer;
   timer_->start();
@@ -201,7 +202,7 @@ foot_contact->footForceDataUpdate(td_handles_[0]->force_data(), td_handles_[1]->
                                  td_handles_[2]->force_data(), td_handles_[3]->force_data());
 foot_contact->printForce();
 
-if(Isstand_stable)//contact_control
+if(Isstand_stable && !HangUpWalk)//contact_control
 {
   foot_contact->tdEventDetect();
   foot_contact->printContactStatus();
@@ -218,7 +219,7 @@ if(Isstand_stable)//contact_control
 /*************************************************************************************************************/
 count_loop++;
 // if(count_loop>5 ||(Time_Order==3 && Loop_Count>Swing_Num/3*2 && foot_contact->singleFootContactStatus(Leg_Order)))
-if(count_loop>5 && Time_Order<2)
+if(count_loop>5)
 {
 count_loop = 0;
 
@@ -230,16 +231,21 @@ switch (Time_Order)
   break;
 
   case 1:
-  // Isstand_stable = true;
-  // hardware_delay_test();
-  foot_contact->tdEventDetect();
-  if(Loop_Count>3)
+  if(!HangUpWalk)  
   {
-    Isstand_stable = stand_stable(foot_contact->contactStatus());
+    foot_contact->tdEventDetect();
+    if(Loop_Count>3)
+    {
+      Isstand_stable = stand_stable(foot_contact->contactStatus());
+    }
+    if(Isstand_stable)
+    {
+      gesture->imuCalibration();
+    }
   }
-  if(Isstand_stable)
+  else
   {
-    gesture->imuCalibration();
+    Isstand_stable = true;  
   }
   flow_control(Time_Order);
   break;
@@ -890,14 +896,20 @@ switch(timeorder)
 
   case 1:
   // if(Loop_Count>=30)
-  if(Isstand_stable)
+  if(Isstand_stable) 
   {
-    foot_contact->clear();
+    foot_contact->clear();    
     Loop_Count = 0;
     // std::cout<<"Imu data calibration done!"<<std::endl;
-    // Time_Order=2;
-    std::cout<<"Robot has stand stable! Please input 2 to continue:";
-    std::cin>>Time_Order;
+    if(!HangUpWalk)
+    {
+      std::cout<<"Robot has stand stable! Please input 2 to continue:"; 
+      std::cin>>Time_Order; 
+    }
+    else
+    {
+      Time_Order=2;
+    } 
   }
   break;
 
@@ -916,7 +928,7 @@ switch(timeorder)
   break;
 
   case 3:
-  if(Leg_On_Ground)
+  if((Leg_On_Ground && !HangUpWalk) || (Loop_Count>=Swing_Num && HangUpWalk))
   // if(Loop_Count>=Swing_Num)
   {
     // std::cout<<"flow_control: swing done"<<std::endl;
@@ -926,14 +938,14 @@ switch(timeorder)
     {
       SupportLeg[Leg_Order] = true;
     }
-    foot_contact->clear();
+    foot_contact->clear();  
 
-    Time_Order = 2;
+    Time_Order = 2;       
     // std::cout<<"Robot swing done! Please input 2 to continue:";
-    // std::cin>>Time_Order;
-    Leg_Order = (Leg_Order>1)?Leg_Order-2:3-Leg_Order;
+    // std::cin>>Time_Order;      
+    Leg_Order = (Leg_Order>1)?Leg_Order-2:3-Leg_Order;    
     std::cout<<"*******-----------------------------------case 4----------------------------------------*******"<<std::endl;
-  }
+  }       
   break;
 
   // case 4:
