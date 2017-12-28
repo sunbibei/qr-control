@@ -45,3 +45,6 @@ void QrBody::cog(EV3&)         /*= 0*/ {
 
 
 } /* namespace qr_control */
+
+#include <class_loader/class_loader_register_macro.h>
+CLASS_LOADER_REGISTER_CLASS(qr_control::QrBody, Label)

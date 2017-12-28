@@ -57,6 +57,8 @@ protected:
   int64_t         tick_interval_;
   ///! The temporay tick interval(in ms)
   int64_t         sum_interval_;
+  ///!
+  Eigen::Vector3d foots_pos_[LegType::N_LEGS];
 
 
 ///! These variable is temporary.
@@ -71,6 +73,8 @@ private:
   Eigen::Vector2d       delta_cog_;
   Eigen::Vector2d       swing_delta_cog_;
 
+  Eigen::Vector3d       shoulders_[LegType::N_LEGS];
+
 ///! These methods are the callback method for WalkState.
 private:
   ///! The callback for WK_WAITING
@@ -81,6 +85,8 @@ private:
   void walk();
   ///! The debug callback for WK_HANG
   void hang_walk();
+
+  void reverse_kinematics();
 
 private:
   ///! Choice the next swing leg @next by @curr LegType.
@@ -99,9 +105,6 @@ private:
 /////////////////////////////////////////////////////////////
 private:
   void forward_kinematics();
-  void reverse_kinematics();
-
-  void cog_pos_assign1(_Position Adj);
 
   void command_assign(const Angle&);
 
@@ -115,12 +118,8 @@ protected:
 private:
   int Loop_Count;
 
-  Position shoulder_ = {{Body_L, Body_W, 0},
-      {Body_L, -Body_W, 0},
-      {-Body_L, Body_W, 0},
-      {-Body_L, -Body_W, 0}};
   Angle jnts_pos_ = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
-  Position foots_pos_ = { {0, 0, -L0 - L1 - L2},
+  Position foots_pos1_ = { {0, 0, -L0 - L1 - L2},
                           {0, 0, -L0 - L1 - L2},
                           {0, 0, -L0 - L1 - L2},
                           {0, 0, -L0 - L1 - L2}};

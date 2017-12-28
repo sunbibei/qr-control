@@ -75,6 +75,11 @@ Walk::Walk()
   for (auto& c : leg_cmds_)
     c = nullptr;
 
+  shoulders_[LegType::FL] << Body_L , Body_W  , 0;
+  shoulders_[LegType::FR] << Body_L , -Body_W , 0;
+  shoulders_[LegType::HL] << -Body_L, Body_W  , 0;
+  shoulders_[LegType::HR] << -Body_L, -Body_W , 0;
+
   Loop_Count = 0;
 }
 
@@ -207,26 +212,28 @@ void Walk::waiting() {
 
 void Walk::pose_init() {
   if (!is_send_init_cmds_) {
-    foots_pos_.rb.z = -Stance_Height;
-    foots_pos_.lb.z = -Stance_Height;
-    foots_pos_.rf.z = -Stance_Height;
-    foots_pos_.lf.z = -Stance_Height;
-
-    foots_pos_.lf.y = 0;
-    foots_pos_.rf.y = 0;
-    foots_pos_.lb.y = 0;
-    foots_pos_.rb.y = 0;
-
-    foots_pos_.lf.x = 0;
-    foots_pos_.rf.x = 0;
-    foots_pos_.lb.x = 0;
-    foots_pos_.rb.x = 0;
+    for (auto& f : foots_pos_) {
+      f << 0, 0, -Stance_Height;
+    }
+//    foots_pos_.rb.z = -Stance_Height;
+//    foots_pos_.lb.z = -Stance_Height;
+//    foots_pos_.rf.z = -Stance_Height;
+//    foots_pos_.lf.z = -Stance_Height;
+//
+//    foots_pos_.lf.y = 0;
+//    foots_pos_.rf.y = 0;
+//    foots_pos_.lb.y = 0;
+//    foots_pos_.rb.y = 0;
+//
+//    foots_pos_.lf.x = 0;
+//    foots_pos_.rf.x = 0;
+//    foots_pos_.lb.x = 0;
+//    foots_pos_.rb.x = 0;
     reverse_kinematics();
   }
 
   is_send_init_cmds_ = true;
   PRINT_POS_VS_TARGET
-
 }
 
 LegType Walk::choice_next_leg(const LegType curr) {
@@ -282,22 +289,25 @@ void Walk::hang_walk() {
 }
 
 void Walk::next_foot_pt() {
+  Pos_start.x = foots_pos_[swing_leg_].x();
+  Pos_start.y = foots_pos_[swing_leg_].y();
+  Pos_start.z = foots_pos_[swing_leg_].z();
   switch(swing_leg_)
   {
     case LegType::FL:
-      Pos_start = foots_pos_.lf;
+      // Pos_start = foots_pos_.lf;
       Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
       break;
     case LegType::FR:
-      Pos_start = foots_pos_.rf;
+      // Pos_start = foots_pos_.rf;
       Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
       break;
     case LegType::HL:
-      Pos_start = foots_pos_.lb;
+      // Pos_start = foots_pos_.lb;
       Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
       break;
     case LegType::HR:
-      Pos_start = foots_pos_.rb;
+      // Pos_start = foots_pos_.rb;
       Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
       break;
     default:break;
@@ -305,7 +315,6 @@ void Walk::next_foot_pt() {
 }
 
 void Walk::move_cog() {
-  Eigen::Vector2d adj;
   if (Loop_Count <= 1) {
     delta_cog_ = delta_cog(swing_leg_);
     if ((LegType::FL == swing_leg_) || (LegType::FR == swing_leg_))
@@ -314,15 +323,8 @@ void Walk::move_cog() {
       Stance_Num = 50;
   }
 
-  adj = stance_velocity(delta_cog_, Loop_Count);
-  // adj1 = get_stance_velocity(Cog_adj, Loop_Count);
-  // std::cout<<"cog_adj h_adj_step:";
-
-  // TODO
-  cog_pos_assign(adj);
-  // cog_pos_assign1(adj1);
+  cog_pos_assign(stance_velocity(delta_cog_, Loop_Count));
   reverse_kinematics();
-  // std::cout<<"cog_adj after: Pos_ptr.z:"<<foots_pos_.lf.z<<" "<<foots_pos_.rf.z<<" "<<foots_pos_.lb.z<<" "<<foots_pos_.rb.z<<" "<<std::endl;
 }
 
 Eigen::Vector2d Walk::delta_cog(LegType leg) {
@@ -332,17 +334,17 @@ Eigen::Vector2d Walk::delta_cog(LegType leg) {
     case LegType::FL:
     case LegType::HL:
       // TODO
-      _p0 << (foots_pos_.lf + shoulder_.lf).x, (foots_pos_.lf + shoulder_.lf).y;
-      _p1 << (foots_pos_.rb + shoulder_.rb).x, (foots_pos_.rb + shoulder_.rb).y;
-      _p2 << (foots_pos_.rf + shoulder_.rf).x, (foots_pos_.rf + shoulder_.rf).y;
-      _p3 << (foots_pos_.lb + shoulder_.lb).x, (foots_pos_.lb + shoulder_.lb).y;
+      _p0 = (foots_pos_[LegType::FL] + shoulders_[LegType::FL]).head(2);
+      _p1 = (foots_pos_[LegType::HR] + shoulders_[LegType::HR]).head(2);
+      _p2 = (foots_pos_[LegType::FR] + shoulders_[LegType::FR]).head(2);
+      _p3 = (foots_pos_[LegType::HL] + shoulders_[LegType::HL]).head(2);
       break;
     case LegType::FR:
     case LegType::HR:
-      _p2 << (foots_pos_.lf + shoulder_.lf).x, (foots_pos_.lf + shoulder_.lf).y;
-      _p3 << (foots_pos_.rb + shoulder_.rb).x, (foots_pos_.rb + shoulder_.rb).y;
-      _p0 << (foots_pos_.rf + shoulder_.rf).x, (foots_pos_.rf + shoulder_.rf).y;
-      _p1 << (foots_pos_.lb + shoulder_.lb).x, (foots_pos_.lb + shoulder_.lb).y;
+      _p2 = (foots_pos_[LegType::FL] + shoulders_[LegType::FL]).head(2);
+      _p3 = (foots_pos_[LegType::HR] + shoulders_[LegType::HR]).head(2);
+      _p0 = (foots_pos_[LegType::FR] + shoulders_[LegType::FR]).head(2);
+      _p1 = (foots_pos_[LegType::HL] + shoulders_[LegType::HL]).head(2);
       break;
     default:
       LOG_WARNING << "What fucking code with LEG!";
@@ -372,22 +374,8 @@ void Walk::swing_leg(const LegType& leg) {
       s1.x = s(0); s1.y = s(1); s1.z = s(2);
       // foot_vel = swing->compoundCycloidVelocity(Pos_start, Desired_Foot_Pos, Loop_Count, Swing_Num, Swing_Height);
 
-      switch(leg)
-      {
-        case LegType::FL:
-          foots_pos_.lf = Pos_start + s1;
-        break;
-        case LegType::FR:
-          foots_pos_.rf = Pos_start + s1;
-        break;
-        case LegType::HL:
-          foots_pos_.lb = Pos_start + s1;
-        break;
-        case LegType::HR:
-          foots_pos_.rb = Pos_start + s1;
-        break;
-        default:break;
-      }
+      _Position tmp = Pos_start + s1;
+      foots_pos_[leg] << tmp.x, tmp.y, tmp.z;
     }
 
     // cog moving
@@ -411,77 +399,23 @@ void Walk::swing_leg(const LegType& leg) {
 
 void Walk::on_ground(const LegType& l) {
   double err = 0.1;
-  Eigen::Vector3d pos;
+  // Eigen::Vector3d pos;
   Eigen::VectorXd jnt((int)JntType::N_JNTS);
-  // jnt.resize;
-  switch (l)
-  {
-  case LegType::FL:
-    foots_pos_.lf.z = foots_pos_.lf.z - err;
-    pos << foots_pos_.lf.x, foots_pos_.lf.y, foots_pos_.lf.z;
-    __kinematics(pos, -1, jnt);
-    jnts_pos_.lf.pitch = jnt(JntType::YAW);
-    jnts_pos_.lf.hip   = jnt(JntType::HIP);
-    jnts_pos_.lf.knee  = jnt(JntType::KNEE);
-    // jnts_pos_.lf = math->cal_kinematics(foots_pos_.lf,-1);
-    break;
-  case LegType::FR:
-    foots_pos_.rf.z = foots_pos_.rf.z - err;
-    pos << foots_pos_.rf.x, foots_pos_.rf.y, foots_pos_.rf.z;
-    __kinematics(pos, -1, jnt);
-    jnts_pos_.rf.pitch = jnt(JntType::YAW);
-    jnts_pos_.rf.hip   = jnt(JntType::HIP);
-    jnts_pos_.rf.knee  = jnt(JntType::KNEE);
-
-    // jnts_pos_.rf = math->cal_kinematics(foots_pos_.rf,-1);
-    break;
-  case LegType::HL:
-    foots_pos_.lb.z = foots_pos_.lb.z - err;
-    pos << foots_pos_.lb.x, foots_pos_.lb.y, foots_pos_.lb.z;
-    __kinematics(pos, -1, jnt);
-    jnts_pos_.lb.pitch = jnt(JntType::YAW);
-    jnts_pos_.lb.hip   = jnt(JntType::HIP);
-    jnts_pos_.lb.knee  = jnt(JntType::KNEE);
-    // jnts_pos_.lb = math->cal_kinematics(foots_pos_.lb, 1);
-    break;
-  case LegType::HR:
-    foots_pos_.rb.z = foots_pos_.rb.z - err;
-    pos << foots_pos_.rb.x, foots_pos_.rb.y, foots_pos_.rb.z;
-    __kinematics(pos, -1, jnt);
-    jnts_pos_.rb.pitch = jnt(JntType::YAW);
-    jnts_pos_.rb.hip   = jnt(JntType::HIP);
-    jnts_pos_.rb.knee  = jnt(JntType::KNEE);
-    // jnts_pos_.rb = math->cal_kinematics(foots_pos_.rb, 1);
-    break;
-  default:
-    LOG_ERROR << "What fucking LEG";
-  }
+  foots_pos_[l].z() = foots_pos_[l].z() - err;
+  // foots_pos_.lf.z = foots_pos_.lf.z - err;
+  // pos << foots_pos_.lf.x, foots_pos_.lf.y, foots_pos_.lf.z;
+  __kinematics(foots_pos_[l], -1, jnt);
+  jnts_pos_.lf.pitch = jnt(JntType::YAW);
+  jnts_pos_.lf.hip   = jnt(JntType::HIP);
+  jnts_pos_.lf.knee  = jnt(JntType::KNEE);
 }
 
 void Walk::cog_swing(const _Position& Adj, const LegType& leg) {
-  switch(leg)
-  {
-    case LegType::FL:
-      foots_pos_.rf = foots_pos_.rf - Adj;
-      foots_pos_.lb = foots_pos_.lb - Adj;
-      foots_pos_.rb = foots_pos_.rb - Adj;
-      break;
-    case LegType::FR:
-      foots_pos_.lf = foots_pos_.lf - Adj;
-      foots_pos_.lb = foots_pos_.lb - Adj;
-      foots_pos_.rb = foots_pos_.rb - Adj;
-      break;
-    case LegType::HL:
-      foots_pos_.lf = foots_pos_.lf - Adj;
-      foots_pos_.rf = foots_pos_.rf - Adj;
-      foots_pos_.rb = foots_pos_.rb - Adj;
-      break;
-    case LegType::HR:
-      foots_pos_.lf = foots_pos_.lf - Adj;
-      foots_pos_.rf = foots_pos_.rf - Adj;
-      foots_pos_.lb = foots_pos_.lb - Adj;
-      break;
-    default:break;
+  Eigen::Vector3d _adj(Adj.x, Adj.y, Adj.z);
+  for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
+    if (leg == l) continue;
+
+    foots_pos_[l] -= _adj;
   }
 }
 
@@ -554,74 +488,45 @@ void Walk::forward_kinematics()
   lb(JntType::YAW) = jnts_pos_.lb.pitch; lb(JntType::HIP) = jnts_pos_.lb.hip; lb(JntType::KNEE) = jnts_pos_.lb.knee;
   rb(JntType::YAW) = jnts_pos_.rb.pitch; rb(JntType::HIP) = jnts_pos_.rb.hip; rb(JntType::KNEE) = jnts_pos_.rb.knee;
   Eigen::Vector3d olf, orf, olb, orb;
-  __formula(lf, olf);
-  __formula(rf, orf);
-  __formula(lb, olb);
-  __formula(rb, orb);
-  foots_pos_.lf.x = olf.x(); foots_pos_.lf.y = olf.y(); foots_pos_.lf.z = olf.z();
-  foots_pos_.rf.x = orf.x(); foots_pos_.rf.y = orf.y(); foots_pos_.rf.z = orf.z();
-  foots_pos_.lb.x = olb.x(); foots_pos_.lb.y = olb.y(); foots_pos_.lb.z = olb.z();
-  foots_pos_.rb.x = orb.x(); foots_pos_.lf.y = orb.y(); foots_pos_.rb.z = orb.z();
-
-//  foots_pos_.lf = math->cal_formula(jnts_pos_.lf);
-//foots_pos_.rf = math->cal_formula(jnts_pos_.rf);
-//foots_pos_.lb = math->cal_formula(jnts_pos_.lb);
-//foots_pos_.rb = math->cal_formula(jnts_pos_.rb);
+  __formula(lf, foots_pos_[LegType::FL]);
+  __formula(rf, foots_pos_[LegType::FR]);
+  __formula(lb, foots_pos_[LegType::HL]);
+  __formula(rb, foots_pos_[LegType::HR]);
 }
 
-
 void Walk::reverse_kinematics() {
-  Eigen::Vector3d pos;
   Eigen::VectorXd jnt((int)JntType::N_JNTS);
-  pos << foots_pos_.lf.x, foots_pos_.lf.y, foots_pos_.lf.z;
-  __kinematics(pos, -1, jnt);
+  leg_ifaces_[LegType::FL]->inverseKinematics(foots_pos_[LegType::FL], jnt);
+  // __kinematics(pos, -1, jnt);
   jnts_pos_.lf.pitch = jnt(JntType::YAW);
   jnts_pos_.lf.hip   = jnt(JntType::HIP);
   jnts_pos_.lf.knee  = jnt(JntType::KNEE);
 
-  pos << foots_pos_.rf.x, foots_pos_.rf.y, foots_pos_.rf.z;
-  __kinematics(pos, -1, jnt);
+  leg_ifaces_[LegType::FR]->inverseKinematics(foots_pos_[LegType::FR], jnt);
+  // __kinematics(pos, -1, jnt);
   jnts_pos_.rf.pitch = jnt(JntType::YAW);
   jnts_pos_.rf.hip   = jnt(JntType::HIP);
   jnts_pos_.rf.knee  = jnt(JntType::KNEE);
 
-  pos << foots_pos_.lb.x, foots_pos_.lb.y, foots_pos_.lb.z;
-  __kinematics(pos, 1, jnt);
+  leg_ifaces_[LegType::HL]->inverseKinematics(foots_pos_[LegType::HL], jnt);
+  // __kinematics(pos, 1, jnt);
   jnts_pos_.lb.pitch = jnt(JntType::YAW);
   jnts_pos_.lb.hip   = jnt(JntType::HIP);
   jnts_pos_.lb.knee  = jnt(JntType::KNEE);
 
-  pos << foots_pos_.rb.x, foots_pos_.rb.y, foots_pos_.rb.z;
-  __kinematics(pos, 1, jnt);
+  leg_ifaces_[LegType::HR]->inverseKinematics(foots_pos_[LegType::HR], jnt);
+  // __kinematics(pos, 1, jnt);
   jnts_pos_.rb.pitch = jnt(JntType::YAW);
   jnts_pos_.rb.hip   = jnt(JntType::HIP);
   jnts_pos_.rb.knee  = jnt(JntType::KNEE);
 
-//jnts_pos_.lf = math->cal_kinematics(foots_pos_.lf,-1);
-//jnts_pos_.rf = math->cal_kinematics(foots_pos_.rf,-1);
-//jnts_pos_.lb = math->cal_kinematics(foots_pos_.lb, 1);
-//jnts_pos_.rb = math->cal_kinematics(foots_pos_.rb, 1);
 }
 
 void Walk::cog_pos_assign(const Eigen::Vector2d& _adj) {
-  foots_pos_.lf.x -= _adj.x();
-  foots_pos_.lf.y -= _adj.y();
-
-  foots_pos_.rf.x -= _adj.x();
-  foots_pos_.rf.y -= _adj.y();
-
-  foots_pos_.lb.x -= _adj.x();
-  foots_pos_.lb.y -= _adj.y();
-
-  foots_pos_.rb.x -= _adj.x();
-  foots_pos_.rb.y -= _adj.y();
-}
-
-void Walk::cog_pos_assign1(_Position Adj) {
-  foots_pos_.lf = foots_pos_.lf - Adj;
-  foots_pos_.rf = foots_pos_.rf - Adj;
-  foots_pos_.lb = foots_pos_.lb - Adj;
-  foots_pos_.rb = foots_pos_.rb - Adj;
+  Eigen::Vector3d _adj3d(_adj.x(), _adj.y(), 0);
+  for (auto& f : foots_pos_) {
+    f -= _adj3d;
+  }
 }
 
 /**************************************************************************

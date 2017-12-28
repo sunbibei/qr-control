@@ -25,9 +25,11 @@ static const  int Stance_Height = 46;
 static const  int Init_Num = 5;
 static const  int Swing_Num  = 30;
 static const  int Update_Rate = 100;
+
 static const double L0 = 4;
 static const double L1 = 27.3;
 static const double L2 = 22.5;
+
 static const double Body_L = 27.65;
 static const double Body_W = 16.8;
 static const double Body_D = 10;

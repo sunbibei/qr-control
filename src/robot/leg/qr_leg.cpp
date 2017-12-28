@@ -16,23 +16,31 @@
 
 namespace qr_control {
 // params list and parser from cfg
-struct __PrivateParam 
+class QrLegTopology
 {
-  size_t yaw_len;
-  size_t hip_len;
-  size_t knee_len;  
-
-  __PrivateParam(const MiiString& _prefix) {
+public:
+  QrLegTopology(const MiiString& _prefix) {
     auto cfg = MiiCfgReader::instance();
-    MiiString label = Label::make_label(_prefix, "length");
-    cfg->get_value(label, "yaw", yaw_len);
-    cfg->get_value(label, "hip", hip_len);
-    cfg->get_value(label, "knee",knee_len);   
+    cfg->get_value_fatal(_prefix, "base",  BASE_LEN);
+    cfg->get_value_fatal(_prefix, "thigh", THIGH_LEN);
+    cfg->get_value_fatal(_prefix, "shank", SHANK_LEN);
+    cfg->get_value_fatal(_prefix, "sign",  sign);
   }
+
+  const double& L0()   const { return BASE_LEN;  }
+  const double& L1()   const { return THIGH_LEN; }
+  const double& L2()   const { return SHANK_LEN; }
+  const int&    SIGN() const { return sign; }
+
+private:
+  int    sign;
+  double BASE_LEN;
+  double THIGH_LEN;
+  double SHANK_LEN;
 };
 
 QrLeg::QrLeg()
-  : td_thres_(0), params_(nullptr)
+  : td_thres_(0), topology_(nullptr)
 {
   ; // Nothing to do here.
 }
@@ -43,12 +51,13 @@ bool QrLeg::init() {
   auto cfg = MiiCfgReader::instance();
   cfg->get_value(getLabel(), "td_threshold", td_thres_);
 
+  topology_ = new QrLegTopology(Label::make_label(getLabel(), "topology"));
   return true;
 }
 
 QrLeg::~QrLeg()  {
-  delete params_;
-  params_ = nullptr;
+  delete topology_;
+  topology_ = nullptr;
 }
 
 void QrLeg::followJntTrajectory(JntType jnt, const Trajectory1d _traj)  {
@@ -104,7 +113,7 @@ EMX QrLeg::getTransMatrixT01(const EV3& a)
 EMX QrLeg::getTransMatrixT12(const EV3& a)
 {
   EMX result(4,4);
-  result << cos(a(1)),-sin(a(1)),0,params_->yaw_len,
+  result << cos(a(1)),-sin(a(1)),0, topology_->L0(),
             0,         0,       -1,0, 
             sin(a(1)), cos(a(1)),0,0,
             0,         0,        0,1;
@@ -113,7 +122,7 @@ EMX QrLeg::getTransMatrixT12(const EV3& a)
 EMX QrLeg::getTransMatrixT23(const EV3& a)
 {
   EMX result(4,4);
-  result << cos(a(2)),-sin(a(2)),0,params_->hip_len,
+  result << cos(a(2)),-sin(a(2)),0, topology_->L1(),
             sin(a(2)), cos(a(2)),0,0, 
             0,         0,        1,0,
             0,         0,        0,1;
@@ -122,7 +131,7 @@ EMX QrLeg::getTransMatrixT23(const EV3& a)
 EMX QrLeg::getTransMatrixT34(const EV3& a)
 {
   EMX result(4,4);
-  result << 1,0,0,params_->knee_len,
+  result << 1,0,0, topology_->L2(),
             0,1,0,0, 
             0,0,1,0,
             0,0,0,1;
@@ -132,9 +141,9 @@ EMX QrLeg::getTransMatrixT34(const EV3& a)
 bool QrLeg::getJacobMatrix(const EV3& a, EM3& JacobMatrix, EM3& inverseJacobMatrix)
 {
   bool invertible;
-  float L0 = params_->yaw_len;
-  float L1 = params_->hip_len;
-  float L2 = params_->knee_len;  
+  auto L0 = topology_->L0();
+  auto L1 = topology_->L1();
+  auto L2 = topology_->L2();
 
   JacobMatrix << 0, L1*cos(a(1)) + L2*cos(a(1)+a(2)), L2*cos(a(1)+a(2)),
      L0*cos(a(0)) + L1*cos(a(0))*cos(a(1)) + L2*cos(a(0))*cos(a(1)+a(2)), 
@@ -201,14 +210,14 @@ Formula:
 void QrLeg::forwardKinematics(Eigen::Vector3d& xyz, Eigen::Quaterniond&) {
   // TODO
   const auto& poss = joint_position_const_ref();
-  xyz(0) = params_->hip_len * sin(poss(1))
-                 + params_->knee_len * sin(poss(1) + poss(2));
-  xyz(1) = params_->yaw_len * sin(poss(0))
-                 + params_->hip_len * sin(poss(0)) * cos(poss(1))
-                 + params_->knee_len * sin(poss(0)) * cos(poss(1) + poss(2));
-  xyz(2) = - params_->yaw_len * cos(poss(0))
-                 - params_->hip_len * cos(poss(0)) * cos(poss(1))
-                 - params_->knee_len * cos(poss(0)) * cos(poss(1) + poss(2));
+  xyz(0) = topology_->L1() * sin(poss(1))
+                 + topology_->L2() * sin(poss(1) + poss(2));
+  xyz(1) = topology_->L0() * sin(poss(0))
+                 + topology_->L1() * sin(poss(0)) * cos(poss(1))
+                 + topology_->L2() * sin(poss(0)) * cos(poss(1) + poss(2));
+  xyz(2) = - topology_->L0() * cos(poss(0))
+                 - topology_->L1() * cos(poss(0)) * cos(poss(1))
+                 - topology_->L2() * cos(poss(0)) * cos(poss(1) + poss(2));
 }
 /*
 Description: calculating reverse kinematics for quadruped robot(3 DOF)
@@ -218,23 +227,25 @@ Formula:
    Theta_2 = sgn * acos((Delte^2 + Epsilon^2 - L1^2 - L2^2) / 2 / L1 / L2);
    Meantime, Delte = Px ; Phi = Delte + L2 * S2; Epsilon = L0 + Pz * C0 - Py * S0;
 */
-// void QrLeg::inverseKinematics(const EVX& jnt_pos, EVX& angle) {
-void QrLeg::inverseKinematics(const Eigen::Vector3d& xyz, Eigen::VectorXd& angle) {
-  const auto& jnt_pos = joint_position_const_ref();
+void QrLeg::inverseKinematics(const Eigen::Vector3d& xyz, Eigen::VectorXd& jnts) {
+  if (JntType::N_JNTS != jnts.size())
+    jnts.resize(JntType::N_JNTS);
 
-  int s = -1;  
-  if ((LegType::HL == leg_type_) || (LegType::HR == leg_type_))
-    s = 1;
-  double Delte = -jnt_pos(0);
-  angle(0) = atan(-jnt_pos(1) / jnt_pos(2));
+  double Delte = -xyz.x();
+  jnts(JntType::YAW) = atan(-xyz.y() / xyz.z());
 
-  double Epsilon = params_->yaw_len + jnt_pos(2) * cos(angle(0)) - jnt_pos(1) * sin(angle(0));
-  angle(2)=s*acos((pow(Delte,2)+pow(Epsilon,2)-pow(params_->hip_len,2)-pow(params_->knee_len,2))/2.0/params_->hip_len/params_->knee_len);
+  double Epsilon = topology_->L0() + xyz.z() * cos(jnts(JntType::YAW))
+      - xyz.y() * sin(jnts(JntType::YAW));
 
-  double Phi = Delte + params_->knee_len * sin(angle(2));  
-  Phi = (Phi==0)? 0.000001:Phi;
-  
-  angle(1) = 2*atan((Epsilon+sqrt(pow(Epsilon,2)-Phi*(params_->knee_len*sin(angle(2))-Delte)))/Phi);
+  jnts(JntType::KNEE) = topology_->SIGN() * acos((pow(Delte,2) + pow(Epsilon,2)
+      - pow(topology_->L1(),2) - pow(topology_->L2(),2)) / 2.0 / topology_->L1() / topology_->L2());
+
+  double Phi = Delte + topology_->L2() * sin(jnts(JntType::KNEE));
+  if(Phi == 0)
+    Phi = Phi + 0.000001;
+
+  jnts(JntType::HIP) = 2 * atan((Epsilon + sqrt(pow(Epsilon,2)
+      - Phi * (topology_->L2() * sin(jnts(JntType::KNEE)) - Delte))) / Phi);
 }
 
 void QrLeg::inverseKinematics(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) {
