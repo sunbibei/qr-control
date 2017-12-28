@@ -29,7 +29,7 @@ namespace qr_control {
 
 #define PRINT_CURRENT_POS   __print_positions(PRINT_PARAM_CURRENT_POS);
 #define PRINT_POS_VS_TARGET __print_positions(PRINT_PARAM_CURRENT_POS, PRINT_PARAM_TARGET_POS);
-
+#define PRINT_COMMAND       __print_command(leg_cmds_);
 ///! These are the inline functions forward declare.
 void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
     const Eigen::VectorXd& hl, const Eigen::VectorXd& hr);
@@ -39,18 +39,26 @@ void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
     const Eigen::VectorXd& tfl, const Eigen::VectorXd& tfr,
     const Eigen::VectorXd& thl, const Eigen::VectorXd& thr);
 
-void __print_command(const LegTarget*);
+void __print_command(/*const*/ LegTarget**);
 void __cycloid_position(
       const Eigen::Vector3d&, const Eigen::Vector3d&, int, int, int, Eigen::Vector3d&);
+
 void __cross_point(
     const Eigen::Vector2d& p0_0, const Eigen::Vector2d& p0_1,
     const Eigen::Vector2d& p1_0, const Eigen::Vector2d& p1_1,
     Eigen::Vector2d&);
+
 void __kinematics(const Eigen::Vector3d& pos, int Sgn, Eigen::VectorXd& jnt);
 void __formula(const Eigen::VectorXd&, Eigen::Vector3d&);
-double __inscribed_circle_radius(const Eigen::Vector3d&, const Eigen::Vector3d&, const Eigen::Vector3d&);
-Eigen::Vector3d __inner_heart(const Eigen::Vector3d&, const Eigen::Vector3d&, const Eigen::Vector3d&);
-Eigen::Vector3d __line_section(const Eigen::Vector3d& A, const Eigen::Vector3d& B, double ratio);
+
+double __inscribed_circle_radius(
+    const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
+
+Eigen::Vector2d __inner_heart(
+    const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
+
+Eigen::Vector2d __line_section(
+    const Eigen::Vector2d& A, const Eigen::Vector2d& B, double ratio);
 
 
 Walk::Walk()
@@ -98,7 +106,6 @@ bool Walk::init() {
 
   current_state_ = WalkState::WK_INIT_POSE;
 
-  // TODO
   auto cfg = MiiCfgReader::instance();
   cfg->get_value(getLabel(), "hang",     is_hang_walk_);
   cfg->get_value(getLabel(), "interval", tick_interval_);
@@ -179,7 +186,6 @@ void Walk::checkState() {
 StateMachineBase* Walk::state_machine() { return state_machine_; }
 
 void Walk::prev_tick() {
-  // TODO
   // gesture->updateImuData(imu_quat_[0], imu_quat_[1], imu_quat_[2]);
 }
 
@@ -190,6 +196,8 @@ void Walk::post_tick() {
     leg_ifaces_[leg]->legTarget(*leg_cmds_[leg]);
     leg_ifaces_[leg]->move();
   }
+
+  PRINT_COMMAND
 }
 
 void Walk::waiting() {
@@ -297,29 +305,27 @@ void Walk::next_foot_pt() {
 }
 
 void Walk::move_cog() {
-  _Position adj = {0,0,0};
-
-  if (Loop_Count <= 1)
-  {
-    Cog_adj = get_CoG_adj_vec(Desired_Foot_Pos, swing_leg_);
-    // std::cout<<"CoG adjust vector:"<<Cog_adj.x<<", "<<Cog_adj.y<<std::endl;
+  Eigen::Vector2d adj;
+  if (Loop_Count <= 1) {
+    delta_cog_ = delta_cog(swing_leg_);
     if ((LegType::FL == swing_leg_) || (LegType::FR == swing_leg_))
       Stance_Num = 1;
     else
       Stance_Num = 50;
   }
 
-  adj = get_stance_velocity(Cog_adj, Loop_Count);
+  adj = stance_velocity(delta_cog_, Loop_Count);
+  // adj1 = get_stance_velocity(Cog_adj, Loop_Count);
   // std::cout<<"cog_adj h_adj_step:";
 
-
+  // TODO
   cog_pos_assign(adj);
+  // cog_pos_assign1(adj1);
   reverse_kinematics();
   // std::cout<<"cog_adj after: Pos_ptr.z:"<<foots_pos_.lf.z<<" "<<foots_pos_.rf.z<<" "<<foots_pos_.lb.z<<" "<<foots_pos_.rb.z<<" "<<std::endl;
 }
 
-_Position Walk::get_CoG_adj_vec(const _Position& Next_Foothold, LegType leg) {
-  _Position crosspoint1;
+Eigen::Vector2d Walk::delta_cog(LegType leg) {
   Eigen::Vector2d _cs, _p0, _p1, _p2, _p3;
   switch (leg)
   {
@@ -330,23 +336,21 @@ _Position Walk::get_CoG_adj_vec(const _Position& Next_Foothold, LegType leg) {
       _p1 << (foots_pos_.rb + shoulder_.rb).x, (foots_pos_.rb + shoulder_.rb).y;
       _p2 << (foots_pos_.rf + shoulder_.rf).x, (foots_pos_.rf + shoulder_.rf).y;
       _p3 << (foots_pos_.lb + shoulder_.lb).x, (foots_pos_.lb + shoulder_.lb).y;
-      __cross_point(_p0, _p1, _p2, _p3, _cs);
-      crosspoint1.x = _cs.x(); crosspoint1.y = _cs.y(); crosspoint1.z = 0;
-      return innerTriangle(crosspoint1,
-          foots_pos_.rf + shoulder_.rf,
-          foots_pos_.rb + shoulder_.rb);
+      break;
     case LegType::FR:
     case LegType::HR:
       _p2 << (foots_pos_.lf + shoulder_.lf).x, (foots_pos_.lf + shoulder_.lf).y;
       _p3 << (foots_pos_.rb + shoulder_.rb).x, (foots_pos_.rb + shoulder_.rb).y;
       _p0 << (foots_pos_.rf + shoulder_.rf).x, (foots_pos_.rf + shoulder_.rf).y;
       _p1 << (foots_pos_.lb + shoulder_.lb).x, (foots_pos_.lb + shoulder_.lb).y;
-      __cross_point(_p0, _p1, _p2, _p3, _cs);
-      crosspoint1.x = _cs.x(); crosspoint1.y = _cs.y(); crosspoint1.z = 0;
-      return innerTriangle(crosspoint1,
-          foots_pos_.lf + shoulder_.lf,
-          foots_pos_.lb + shoulder_.lb);
+      break;
+    default:
+      LOG_WARNING << "What fucking code with LEG!";
+      return Eigen::Vector2d(0.0, 0.0);
   }
+
+  __cross_point(_p0, _p1, _p2, _p3, _cs);
+  return inner_triangle(_cs, _p2, _p1);
 }
 
 void Walk::swing_leg(const LegType& leg) {
@@ -481,6 +485,59 @@ void Walk::cog_swing(const _Position& Adj, const LegType& leg) {
   }
 }
 
+Eigen::Vector2d Walk::inner_triangle(
+    const Eigen::Vector2d& _a, const Eigen::Vector2d& _b, const Eigen::Vector2d& _c) {
+  Eigen::Vector2d _init_cog(0.0, 0.0);
+  double ratio = 1;
+  double radius = __inscribed_circle_radius(_a, _b, _c);
+
+  auto iheart = __inner_heart(_a, _b, _c);
+  if(radius>cogThreshold)
+  {
+    ratio = (radius-cogThreshold)/radius;
+    auto _ia = __line_section(_a, iheart, ratio);
+    auto _ib = __line_section(_b, iheart, ratio);
+    auto _ic = __line_section(_c, iheart, ratio);
+
+    Eigen::Vector2d _cs1, _cs2;
+    __cross_point(_ia, _ib, _init_cog, iheart, _cs1);
+    __cross_point(_ia, _ic, _init_cog, iheart, _cs2);
+
+    if (_cs1.x() <= std::max(_ia.x(), _ib.x())
+      && _cs1.x() >= std::min(_ia.x(), _ib.x())) {
+        swing_delta_cog_ = (_ib.x() > _ic.x()) ? _ib - _cs1 : _ic - _cs1;
+        swing_delta_cog_ = swing_delta_cog_ / 2.0;
+        return _cs1;
+    }
+    if (_cs2.x() <= std::max(_ia.x(), _ic.x())
+      && _cs2.x() >= std::min(_ia.x(), _ic.x())) {
+      // std::cout<<"second_cross true"<<std::endl;
+      swing_delta_cog_ = (_ib.x() > _ic.x()) ? _ib - _cs2 : _ic - _cs2;
+      swing_delta_cog_ = swing_delta_cog_ / 2.0;
+      // return _cs2;
+    }
+    return _cs2;
+  } else {
+    return iheart;
+  }
+}
+
+Eigen::Vector2d Walk::stance_velocity(const Eigen::Vector2d& Adj_vec, unsigned int Loop) {
+  if (Loop > Stance_Num) {
+    std::cout << "Loop:" << Loop << " Stance_Num:" << Stance_Num << std::endl;
+    LOG_ERROR << ("Time Order wrong while stance");
+  }
+  Eigen::Vector2d stance_vel(0.0, 0.0);
+  stance_vel.x() = 30 * Adj_vec.x() * pow(Loop,4) / pow(Stance_Num,5)
+      - 60 * Adj_vec.x() * pow(Loop,3) / pow(Stance_Num,4)
+      + 30 * Adj_vec.x() * pow(Loop,2) / pow(Stance_Num,3);
+  stance_vel.y() = 30 * Adj_vec.y() * pow(Loop,4) / pow(Stance_Num,5)
+      - 60 * Adj_vec.y() * pow(Loop,3) / pow(Stance_Num,4)
+      + 30 * Adj_vec.y() * pow(Loop,2) / pow(Stance_Num,3);
+  return stance_vel;
+}
+
+
 void Walk::walk() {
   // TODO
   ;
@@ -546,85 +603,21 @@ void Walk::reverse_kinematics() {
 //jnts_pos_.rb = math->cal_kinematics(foots_pos_.rb, 1);
 }
 
-_Position Walk::innerTriangle(const _Position &A, const _Position &B, const _Position &C) {
-  _Position innerheart, a_inner, b_inner, c_inner, first_cross, second_cross;
-  _Position cog_init(0,0,0);
-  double ratio = 1;
-  Eigen::Vector3d eA, eB, eC, eR;
-  eA << A.x, A.y, A.z; eB << B.x, B.y, B.z; eC << C.x, C.y, C.z;
-  double radius = __inscribed_circle_radius(eA, eB, eC);
+void Walk::cog_pos_assign(const Eigen::Vector2d& _adj) {
+  foots_pos_.lf.x -= _adj.x();
+  foots_pos_.lf.y -= _adj.y();
 
-  // std::cout<<"inscribedCircleRadius:"<<radius<<std::endl;
+  foots_pos_.rf.x -= _adj.x();
+  foots_pos_.rf.y -= _adj.y();
 
-  eR = __inner_heart(eA, eB, eC);
-  innerheart.x = eR.x(); innerheart.y = eR.y(); innerheart.z = eR.z();
-  // std::cout<<"Inner heart:"<<innerheart.x<<","<<innerheart.y<<std::endl;
+  foots_pos_.lb.x -= _adj.x();
+  foots_pos_.lb.y -= _adj.y();
 
-  if(radius>cogThreshold)
-  {
-    ratio = (radius-cogThreshold)/radius;
-    eA = __line_section(eA, eR, ratio);
-    eB = __line_section(eB, eR, ratio);
-    eC = __line_section(eC, eR, ratio);
-
-    a_inner.x = eA.x(); a_inner.y = eA.y(); a_inner.z = eA.z();
-    b_inner.x = eB.x(); b_inner.y = eB.y(); b_inner.z = eB.z();
-    c_inner.x = eC.x(); c_inner.y = eC.y(); c_inner.z = eC.z();
-
-//    a_inner = math->formulaLineSection(A, innerheart, ratio);
-//    b_inner = math->formulaLineSection(B, innerheart, ratio);
-//    c_inner = math->formulaLineSection(C, innerheart, ratio);
-
-    Eigen::Vector2d _p0, _p1, _p2, _p3, _cs;
-    _p0 << a_inner.x, a_inner.y;
-    _p1 << b_inner.x, b_inner.y;
-    _p2 << cog_init.x, cog_init.y;
-    _p3 << innerheart.x, innerheart.y;
-    __cross_point(_p0, _p1, _p2, _p3, _cs);
-    first_cross.x = _cs.x(); first_cross.y = _cs.y(); first_cross.z = 0;
-
-    _p0 << a_inner.x, a_inner.y;
-    _p1 << c_inner.x, c_inner.y;
-    _p2 << cog_init.x, cog_init.y;
-    _p3 << innerheart.x, innerheart.y;
-    __cross_point(_p0, _p1, _p2, _p3, _cs);
-    second_cross.x = _cs.x(); second_cross.y = _cs.y(); second_cross.z = 0;
-    // first_cross = math->getCrossPoint(a_inner,b_inner,cog_init,innerheart);
-    // second_cross = math->getCrossPoint(a_inner,c_inner,cog_init,innerheart);
-
-    // std::cout<<"Ratio:"<<ratio<<std::endl;
-    // std::cout<<"A:"<<A.x<<","<<A.y<<" B:"<<B.x<<","<<B.y<<" C:"<<C.x<<","<<C.y<<std::endl;
-    // std::cout<<"a:"<<a_inner.x<<","<<a_inner.y<<" b:"<<b_inner.x<<","<<b_inner.y<<" c:"<<c_inner.x<<","<<c_inner.y<<std::endl;
-
-    // std::cout<<"first_cross:"<<first_cross.x<<","<<first_cross.y<<std::endl;
-    // std::cout<<"second_cross:"<<second_cross.x<<","<<second_cross.y<<std::endl;
-
-    if(first_cross.x<=max(a_inner.x, b_inner.x) && first_cross.x>=min(a_inner.x, b_inner.x))
-    {
-      // std::cout<<"first_cross true"<<std::endl;
-      swing_adj_CoG = (b_inner.x>c_inner.x) ? b_inner - first_cross : c_inner - first_cross;
-      swing_adj_CoG.x = swing_adj_CoG.x/2.0;
-      swing_adj_CoG.y = swing_adj_CoG.y/2.0;
-      // std::cout<<"swing_adj_CoG: "<<swing_adj_CoG.x <<" "<<swing_adj_CoG.y<<std::endl;
-      return first_cross;
-    }
-    if(second_cross.x<=max(a_inner.x, c_inner.x) && second_cross.x>=min(a_inner.x, c_inner.x))
-    {
-      // std::cout<<"second_cross true"<<std::endl;
-      swing_adj_CoG = (b_inner.x>c_inner.x) ? b_inner - second_cross : c_inner - second_cross;
-      swing_adj_CoG.x = swing_adj_CoG.x/2.0;
-      swing_adj_CoG.y = swing_adj_CoG.y/2.0;
-      // std::cout<<"swing_adj_CoG: "<<swing_adj_CoG.x <<" "<<swing_adj_CoG.y<<std::endl;
-      return second_cross;
-    }
-  }
-  else
-  {
-    return innerheart;
-  }
+  foots_pos_.rb.x -= _adj.x();
+  foots_pos_.rb.y -= _adj.y();
 }
 
-void Walk::cog_pos_assign(_Position Adj) {
+void Walk::cog_pos_assign1(_Position Adj) {
   foots_pos_.lf = foots_pos_.lf - Adj;
   foots_pos_.rf = foots_pos_.rf - Adj;
   foots_pos_.lb = foots_pos_.lb - Adj;
@@ -730,7 +723,7 @@ void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
   printf("-------------------------------------------------------------------------------------\n");
 }
 
-void __print_command(const LegTarget** leg_cmds_) {
+void __print_command(/*const*/ LegTarget** leg_cmds_) {
   printf("_________________________________\n");
   printf("LEG -|   YAW  |   HIP  |  KNEE  |\n");
   printf("FL  -| %+01.04f| %+01.04f| %+01.04f|\n",
@@ -765,9 +758,6 @@ void __cycloid_position(
     pos(2) = 2.0 * H * ((float)Loop/(float)T - 1.0/4.0/M_PI*sin(4.0*M_PI*Loop/T));
   else if(Loop<=T)
     pos(2) = 2.0 * H * ((float)(T-Loop)/(float)T - 1.0/4.0/M_PI*sin(4.0*M_PI*(T-Loop)/T));
-
-//  if(verbose)
-//    std::cout<<"Swing class:"<<p(0)<<" "<<p(1)<<" "<<p(2)<<std::endl;
 }
 
 void __cross_point(
@@ -825,7 +815,8 @@ void __formula(const Eigen::VectorXd& in, Eigen::Vector3d& out)
       - L2 * cos(in(JntType::YAW)) * cos(in(JntType::HIP) + in(JntType::KNEE));
 }
 
-double __inscribed_circle_radius(const Eigen::Vector3d& A, const Eigen::Vector3d& B, const Eigen::Vector3d& C) {
+double __inscribed_circle_radius(
+    const Eigen::Vector2d& A, const Eigen::Vector2d& B, const Eigen::Vector2d& C) {
   float c = sqrt(pow((A.x()-B.x()),2) + pow((A.y()-B.y()),2));
   float b = sqrt(pow((A.x()-C.x()),2) + pow((A.y()-C.y()),2));
   float a = sqrt(pow((C.x()-B.x()),2) + pow((C.y()-B.y()),2));
@@ -834,9 +825,10 @@ double __inscribed_circle_radius(const Eigen::Vector3d& A, const Eigen::Vector3d
   return 2*s/(a+b+c);
 }
 
-Eigen::Vector3d __inner_heart(const Eigen::Vector3d& A, const Eigen::Vector3d& B, const Eigen::Vector3d& C) {
+Eigen::Vector2d __inner_heart(
+    const Eigen::Vector2d& A, const Eigen::Vector2d& B, const Eigen::Vector2d& C) {
   double a = 0, b = 0, c = 0;
-  Eigen::Vector3d heart(0.0, 0.0, 0.0);
+  Eigen::Vector2d heart(0.0, 0.0);
 
   a = sqrt(pow(B.x() - C.x(), 2) + pow(B.y() - C.y(), 2));
   b = sqrt(pow(A.x() - C.x(), 2) + pow(A.y() - C.y(), 2));
@@ -847,8 +839,9 @@ Eigen::Vector3d __inner_heart(const Eigen::Vector3d& A, const Eigen::Vector3d& B
   return heart;
 }
 
-Eigen::Vector3d __line_section(const Eigen::Vector3d& A, const Eigen::Vector3d& B, double ratio) {
-  Eigen::Vector3d result;
+Eigen::Vector2d __line_section(
+    const Eigen::Vector2d& A, const Eigen::Vector2d& B, double ratio) {
+  Eigen::Vector2d result;
   result.x() = B.x() - ratio * (B.x() - A.x());
   result.y() = B.y() - ratio * (B.y() - A.y());
   return result;

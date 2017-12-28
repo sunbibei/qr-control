@@ -67,6 +67,9 @@ private:
   unsigned int          internal_order_;
   ///! The current swing leg
   LegType               swing_leg_;
+  ///! The cog adjust vector
+  Eigen::Vector2d       delta_cog_;
+  Eigen::Vector2d       swing_delta_cog_;
 
 ///! These methods are the callback method for WalkState.
 private:
@@ -87,8 +90,10 @@ private:
   void    swing_leg(const LegType&);
   void    on_ground(const LegType&);
   void    cog_swing(const _Position&, const LegType&);
-  _Position    get_CoG_adj_vec(const _Position&, LegType);
-
+  Eigen::Vector2d delta_cog(LegType);
+  Eigen::Vector2d inner_triangle(const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
+  Eigen::Vector2d stance_velocity(const Eigen::Vector2d&, unsigned int);
+  void cog_pos_assign(const Eigen::Vector2d& Adj);
 /////////////////////////////////////////////////////////////
 ///////////////////////// OLD CODE //////////////////////////
 /////////////////////////////////////////////////////////////
@@ -96,11 +101,10 @@ private:
   void forward_kinematics();
   void reverse_kinematics();
 
-  void cog_pos_assign(_Position Adj);
+  void cog_pos_assign1(_Position Adj);
 
   void command_assign(const Angle&);
 
-  _Position innerTriangle(const _Position &A, const _Position &B, const _Position &C);
   _Position get_stance_velocity(_Position Adj_vec, unsigned int Loop);
 
 protected:
@@ -124,6 +128,7 @@ private:
   _Position Desired_Foot_Pos = {0,0,0};
   _Position Pos_start,Cog_adj;
   _Position swing_adj_CoG;
+
 };
 
 } /* namespace qr_control */
