@@ -9,9 +9,7 @@
 #define INCLUDE_GAIT_WALK_WALK_H_
 
 #include "gait/gait_base.h"
-
-#include "ultility.h"
-#include "math.h"
+#include <Eigen/Dense>
 
 ///! Forward declaration
 class TimeControl;
@@ -49,21 +47,24 @@ protected:
   class QrBody*         body_iface_;
   ///! The interface for legs
   class QrLeg*          leg_ifaces_[LegType::N_LEGS];
-  ///! The commands of legs.
+  ///! The commands of legs. TODO Unused
   class LegTarget*      leg_cmds_[LegType::N_LEGS];
   ///! Whether is hang?
   bool            is_hang_walk_;
   ///! The Control tick interval(in ms)
   int64_t         tick_interval_;
-  ///! The temporay tick interval(in ms)
+  ///! The temporary tick interval(in ms)
   int64_t         sum_interval_;
-  ///!
+  ///! The position of each foot
   Eigen::Vector3d foots_pos_[LegType::N_LEGS];
+  ///! The position of joints each leg
   Eigen::VectorXd jnts_pos_ [LegType::N_LEGS];
-
+  ///! The last position of swing leg
   Eigen::Vector3d last_foot_pos_;
+  ///! The target position of swing leg
   Eigen::Vector3d next_foot_pos_;
-
+  ///! Variables about gait control
+  class WalkCoeff* coeff_;
 
 ///! These variable is temporary.
 private:
@@ -77,8 +78,6 @@ private:
   Eigen::Vector2d       delta_cog_;
   Eigen::Vector2d       swing_delta_cog_;
 
-  Eigen::Vector3d       shoulders_[LegType::N_LEGS];
-
 ///! These methods are the callback method for WalkState.
 private:
   ///! The callback for WK_WAITING
@@ -91,10 +90,11 @@ private:
   void hang_walk();
 
   void reverse_kinematics();
+  void forward_kinematics();
 
 private:
   ///! Choice the next swing leg @next by @curr LegType.
-  LegType choice_next_leg(const LegType curr);
+  LegType next_leg(const LegType curr);
   void    next_foot_pt();
   void    move_cog();
   void    swing_leg(const LegType&);
@@ -108,11 +108,7 @@ private:
 ///////////////////////// OLD CODE //////////////////////////
 /////////////////////////////////////////////////////////////
 private:
-  void forward_kinematics();
 
-  void command_assign();
-
-  _Position get_stance_velocity(_Position Adj_vec, unsigned int Loop);
 
 protected:
   // Math* math;

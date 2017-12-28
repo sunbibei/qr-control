@@ -29,6 +29,8 @@ public:
   virtual void velocity(EV3& v)  override /*= 0*/;
   ///! The centre of gravity of robot
   virtual void cog(EV3&)         override /*= 0*/;
+
+  virtual void leg_base(LegType, Eigen::Vector3d&) override;
 };
 
 } /* namespace qr_control */

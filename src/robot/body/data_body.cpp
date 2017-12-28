@@ -36,13 +36,28 @@ struct _ImuSensor {
   }
 };
 
+struct _BodyTopology {
+  double length;
+  double height;
+  double width;
+
+  _BodyTopology(const MiiString& tag) {
+    auto cfg = MiiCfgReader::instance();
+    cfg->get_value_fatal(tag, "length", length);
+    cfg->get_value_fatal(tag, "height", height);
+    cfg->get_value_fatal(tag, "width" , width);
+  }
+};
+
 DataBody::DataBody(const MiiString& _l)
-  : Label(_l), imu_sensor_(nullptr) {
+  : Label(_l), imu_sensor_(nullptr),
+    body_size_(nullptr) {
   ;
 }
 
 bool DataBody::init() {
   imu_sensor_ = new _ImuSensor(Label::make_label(getLabel(), "imu"));
+  body_size_  = new _BodyTopology(Label::make_label(getLabel(), "topology"));
   // auto cfg = MiiCfgReader::instance();
 
   return true;
@@ -52,6 +67,15 @@ DataBody::~DataBody() {
   delete imu_sensor_;
   imu_sensor_ = nullptr;
 }
+
+double DataBody::body_length() const
+{ return body_size_->length; }
+
+double DataBody::body_height() const
+{ return body_size_->height; }
+
+double DataBody::body_width()  const
+{ return body_size_->width; }
 
 Eigen::VectorXd        DataBody::orientation()               const
 { return *imu_sensor_->quat_; }

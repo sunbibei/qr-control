@@ -13,6 +13,7 @@
 namespace qr_control {
 
 class MathBody: public DataBody {
+///! These are the
 public:
   ///! The pose of robot against the world frame
   virtual void pose(Eigen::Vector3d&, Eigen::Quaterniond&) = 0;
@@ -24,6 +25,10 @@ public:
   virtual void velocity(Eigen::Vector3d& v)  = 0;
   ///! The centre of gravity of robot
   virtual void cog(Eigen::Vector3d&)         = 0;
+
+public:
+  ///! The translation of LegType shoulder(leg_base frame) of robot against the world frame.
+  virtual void leg_base(LegType, Eigen::Vector3d&) = 0;
 };
 
 } /* namespace qr_control */

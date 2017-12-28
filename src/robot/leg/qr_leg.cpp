@@ -206,18 +206,23 @@ Formula:
    Py = L0 * S0 + L1 * S0 * C1 + L2 * S0 * C12;
    Pz = - Lo * C0 - L1 * C0 * C1 - L2 * C0 * C12;
 */
-// void QrLeg::forwardKinematics(const EVX& angle, EVX& jnt_pos)
 void QrLeg::forwardKinematics(Eigen::Vector3d& xyz, Eigen::Quaterniond&) {
-  // TODO
-  const auto& poss = joint_position_const_ref();
-  xyz(0) = topology_->L1() * sin(poss(1))
-                 + topology_->L2() * sin(poss(1) + poss(2));
-  xyz(1) = topology_->L0() * sin(poss(0))
-                 + topology_->L1() * sin(poss(0)) * cos(poss(1))
-                 + topology_->L2() * sin(poss(0)) * cos(poss(1) + poss(2));
-  xyz(2) = - topology_->L0() * cos(poss(0))
-                 - topology_->L1() * cos(poss(0)) * cos(poss(1))
-                 - topology_->L2() * cos(poss(0)) * cos(poss(1) + poss(2));
+  LOG_ERROR << "Call the 'forwardKinematics' which has does not complemented.";
+}
+
+void QrLeg::forwardKinematics(Eigen::Vector3d& xyz) {
+  xyz.x() = topology_->L1() * sin(hip())
+      + topology_->L2() * sin(hip() + knee());
+
+  xyz.y() = topology_->L0() * sin(yaw()) + topology_->L1() * sin(yaw()) * cos(hip())
+      + topology_->L2() * sin(yaw()) * cos(hip() + knee());
+
+  xyz.z() = - topology_->L0() * cos(yaw()) - topology_->L1() * cos(yaw()) * cos(hip())
+      - topology_->L2() * cos(yaw()) * cos(hip() + knee());
+}
+
+void QrLeg::forwardKinematics(Eigen::Quaterniond&) {
+  LOG_ERROR << "Call the 'forwardKinematics' which has does not complemented.";
 }
 /*
 Description: calculating reverse kinematics for quadruped robot(3 DOF)

@@ -43,6 +43,25 @@ void QrBody::cog(EV3&)         /*= 0*/ {
   LOG_ERROR << "Call the 'cog' which has does not complemented.";
 }
 
+void QrBody::leg_base(LegType leg, Eigen::Vector3d& _xyz) {
+  switch (leg) {
+  case LegType::FL:
+    _xyz << body_length(), body_width(), 0;
+    break;
+  case LegType::FR:
+    _xyz << body_length(), -body_width(), 0;
+    break;
+  case LegType::HL:
+    _xyz << -body_length(), body_width(), 0;
+    break;
+  case LegType::HR:
+    _xyz << -body_length(), -body_width(), 0;
+    break;
+  default:
+    LOG_ERROR << "ERROR LegType";
+    break;
+  }
+}
 
 } /* namespace qr_control */
 
