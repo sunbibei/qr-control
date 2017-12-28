@@ -341,6 +341,7 @@ void Walk::swing_leg(const LegType& leg) {
   EV3 foot_vel(0,0,0),joint_vel(0,0,0),joint_pos(0,0,0);
   _Position s1 = {0,0,0};
   Eigen::Vector3d s;
+  Eigen::Vector2d s2d;
   LegState _td = LegState::AIR_STATE;
 
   if(Loop_Count <= Swing_Num) {
@@ -357,7 +358,9 @@ void Walk::swing_leg(const LegType& leg) {
     if(Loop_Count<=Swing_Num/3*2)
     {
       Stance_Num = Swing_Num/3*2;
-      s1 = get_stance_velocity(swing_adj_CoG, Loop_Count);
+      s2d = stance_velocity(swing_delta_cog_, Loop_Count);
+      s1.x = s2d.x(); s1.y = s2d.y(); s1.z = s2d.z();
+      // s1 = get_stance_velocity(swing_adj_CoG, Loop_Count);
       cog_swing(s1, leg);
     }
   } else {

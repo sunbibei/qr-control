@@ -122,7 +122,6 @@ protected:
 private:
   int Loop_Count;
 
-  _Position Cog_adj;
   _Position swing_adj_CoG;
 
 };
