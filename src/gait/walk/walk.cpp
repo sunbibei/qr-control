@@ -63,8 +63,9 @@ Eigen::Vector2d __line_section(
 
 Walk::Walk()
   : current_state_(WalkState::UNKNOWN_WK_STATE),
-    state_machine_(nullptr), is_hang_walk_(false),
-    tick_interval_(50), sum_interval_(0),
+    state_machine_(nullptr), body_iface_(nullptr),
+    is_hang_walk_(false), tick_interval_(50),
+    sum_interval_(0),
     /* These variables are the private. */
     timer_(nullptr), is_send_init_cmds_(false),
     internal_order_(0), swing_leg_(LegType::HL)
@@ -386,15 +387,6 @@ void Walk::on_ground(const LegType& l) {
 //  jnts_pos_.lf.pitch = jnt(JntType::YAW);
 //  jnts_pos_.lf.hip   = jnt(JntType::HIP);
 //  jnts_pos_.lf.knee  = jnt(JntType::KNEE);
-}
-
-void Walk::cog_swing(const _Position& Adj, const LegType& leg) {
-  Eigen::Vector3d _adj(Adj.x, Adj.y, Adj.z);
-  for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-    if (leg == l) continue;
-
-    foots_pos_[l] -= _adj;
-  }
 }
 
 Eigen::Vector2d Walk::inner_triangle(

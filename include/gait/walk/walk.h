@@ -99,7 +99,7 @@ private:
   void    move_cog();
   void    swing_leg(const LegType&);
   void    on_ground(const LegType&);
-  void    cog_swing(const _Position&, const LegType&);
+
   Eigen::Vector2d delta_cog(LegType);
   Eigen::Vector2d inner_triangle(const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
   Eigen::Vector2d stance_velocity(const Eigen::Vector2d&, unsigned int);
