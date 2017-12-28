@@ -121,9 +121,6 @@ protected:
   // boost::scoped_ptr<realtime_tools::RealtimePublisher<std_msgs::Float64MultiArray>> joint_state_publisher_;
 private:
   int Loop_Count;
-
-  _Position swing_adj_CoG;
-
 };
 
 } /* namespace qr_control */

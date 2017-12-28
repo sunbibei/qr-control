@@ -355,14 +355,14 @@ void Walk::swing_leg(const LegType& leg) {
     }
 
     // cog moving
-    if(Loop_Count<=Swing_Num/3*2)
-    {
-      Stance_Num = Swing_Num/3*2;
-      s2d = stance_velocity(swing_delta_cog_, Loop_Count);
-      s1.x = s2d.x(); s1.y = s2d.y(); s1.z = s2d.z();
-      // s1 = get_stance_velocity(swing_adj_CoG, Loop_Count);
-      cog_swing(s1, leg);
-    }
+//    if(Loop_Count<=Swing_Num/3*2)
+//    {
+//      Stance_Num = Swing_Num/3*2;
+//      s2d = stance_velocity(swing_delta_cog_, Loop_Count);
+//      s1.x = s2d.x(); s1.y = s2d.y(); s1.z = 0;
+//      // s1 = get_stance_velocity(swing_adj_CoG, Loop_Count);
+//      cog_swing(s1, leg);
+//    }
   } else {
     _td = leg_ifaces_[leg]->leg_state();
     // Leg_On_Ground = foot_contact->singleFootContactStatus(leg);
