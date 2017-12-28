@@ -22,14 +22,14 @@ namespace qr_control {
     leg_ifaces_[LegType::HR]->joint_position_const_ref()
 
 #define PRINT_PARAM_TARGET_POS \
-    jnts_pos_[LegType::FL], \
-    jnts_pos_[LegType::FR], \
-    jnts_pos_[LegType::HL], \
-    jnts_pos_[LegType::HR]
+    jnts_pos_cmd_[LegType::FL], \
+    jnts_pos_cmd_[LegType::FR], \
+    jnts_pos_cmd_[LegType::HL], \
+    jnts_pos_cmd_[LegType::HR]
 
 #define PRINT_CURRENT_POS   __print_positions(PRINT_PARAM_CURRENT_POS);
 #define PRINT_POS_VS_TARGET __print_positions(PRINT_PARAM_CURRENT_POS, PRINT_PARAM_TARGET_POS);
-#define PRINT_COMMAND       __print_command(jnts_pos_);
+#define PRINT_COMMAND       __print_command(jnts_pos_cmd_);
 
 ///! These are the inline functions forward declare.
 void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
@@ -101,13 +101,22 @@ Walk::Walk()
   for (auto& c : leg_cmds_)
     c = nullptr;
 
-  for (auto& j : jnts_pos_)
+  for (auto& j : jnts_pos_cmd_)
     j.resize(JntType::N_JNTS);
 
   Loop_Count = 0;
+
+#ifdef PUB_ROS_TOPIC
+  nh_.reset(new ros::NodeHandle("~"));
+#endif
 }
 
 Walk::~Walk() {
+#ifdef PUB_ROS_TOPIC
+  nh_.reset();
+  cmd_pub_.reset();
+#endif
+
   delete timer_;
   timer_ = nullptr;
 
@@ -179,8 +188,10 @@ bool Walk::init() {
   _tag = Label::make_label(getLabel(), "coefficient");
   coeff_ = new WalkCoeff(_tag);
 
-//  joint_state_publisher_.reset( new realtime_tools::RealtimePublisher<
-//    std_msgs::Float64MultiArray>(n, "/dragon/joint_commands", 10));
+#ifdef PUB_ROS_TOPIC
+  cmd_pub_.reset(new realtime_tools::RealtimePublisher<
+      std_msgs::Float64MultiArray>(*nh_, "/dragon/joint_commands", 10));
+#endif
 
   timer_ = new TimeControl;
   timer_->start();
@@ -195,7 +206,7 @@ void Walk::checkState() {
   {
     if (!is_send_init_cmds_) return;
     for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-      auto diff = (leg_cmds_[l]->target - leg_ifaces_[l]->joint_position_const_ref()).norm();
+      auto diff = (jnts_pos_cmd_[l] - leg_ifaces_[l]->joint_position_const_ref()).norm();
       if (diff > 0.1) return;
     }
     LOG_WARNING << "INIT POSE OK!";
@@ -232,14 +243,25 @@ void Walk::prev_tick() {
 }
 
 void Walk::post_tick() {
-  // std::cout << "Walk::post_tick()" << std::endl;
-  // command_assign();
   for (const auto& leg : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-    leg_ifaces_[leg]->legTarget(JntCmdType::CMD_POS, jnts_pos_[leg]);
+    leg_ifaces_[leg]->legTarget(JntCmdType::CMD_POS, jnts_pos_cmd_[leg]);
     leg_ifaces_[leg]->move();
   }
 
   PRINT_COMMAND
+
+#ifdef PUB_ROS_TOPIC
+  if(cmd_pub_->trylock()) {
+    cmd_pub_->msg_.data.clear();
+    for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
+      const auto& cmds = jnts_pos_cmd_[l];
+      for (const auto& j : {JntType::YAW, JntType::HIP, JntType::KNEE}) {
+        cmd_pub_->msg_.data.push_back(cmds(j));
+      }
+    }
+    cmd_pub_->unlockAndPublish();
+  }
+#endif
 }
 
 void Walk::waiting() {
@@ -416,7 +438,7 @@ void Walk::on_ground(const LegType& l) {
   foots_pos_[l].z() = foots_pos_[l].z() - err;
   // foots_pos_.lf.z = foots_pos_.lf.z - err;
   // pos << foots_pos_.lf.x, foots_pos_.lf.y, foots_pos_.lf.z;
-  leg_ifaces_[l]->inverseKinematics(foots_pos_[l], jnts_pos_[LegType::FL]);
+  leg_ifaces_[l]->inverseKinematics(foots_pos_[l], jnts_pos_cmd_[LegType::FL]);
   // __kinematics(foots_pos_[l], -1, jnts_pos_[LegType::FL]);
 //  jnts_pos_.lf.pitch = jnt(JntType::YAW);
 //  jnts_pos_.lf.hip   = jnt(JntType::HIP);
@@ -459,7 +481,7 @@ Eigen::Vector2d Walk::inner_triangle(
   }
 }
 
-Eigen::Vector2d Walk::stance_velocity(const Eigen::Vector2d& Adj_vec, unsigned int Loop) {
+Eigen::Vector2d Walk::stance_velocity(const Eigen::Vector2d& Adj_vec, int Loop) {
   if (Loop > coeff_->STANCE_TIME) {
     std::cout << "Loop:" << Loop << " Stance_Num:" << coeff_->STANCE_TIME << std::endl;
     LOG_ERROR << ("Time Order wrong while stance");
@@ -483,8 +505,7 @@ void Walk::walk() {
 /*************************************************************************************************************/
 /*******************************************  OLD CODE  ******************************************************/
 /*************************************************************************************************************/
-void Walk::forward_kinematics()
-{
+void Walk::forward_kinematics() {
   for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
     leg_ifaces_[l]->forwardKinematics(foots_pos_[l]);
   }
@@ -492,7 +513,7 @@ void Walk::forward_kinematics()
 
 void Walk::reverse_kinematics() {
   for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-    leg_ifaces_[l]->inverseKinematics(foots_pos_[l], jnts_pos_[l]);
+    leg_ifaces_[l]->inverseKinematics(foots_pos_[l], jnts_pos_cmd_[l]);
   }
 }
 
