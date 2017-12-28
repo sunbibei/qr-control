@@ -75,6 +75,9 @@ Walk::Walk()
   for (auto& c : leg_cmds_)
     c = nullptr;
 
+  for (auto& j : jnts_pos_)
+    j.resize(JntType::N_JNTS);
+
   shoulders_[LegType::FL] << Body_L , Body_W  , 0;
   shoulders_[LegType::FR] << Body_L , -Body_W , 0;
   shoulders_[LegType::HL] << -Body_L, Body_W  , 0;
@@ -196,7 +199,7 @@ void Walk::prev_tick() {
 
 void Walk::post_tick() {
   // std::cout << "Walk::post_tick()" << std::endl;
-  command_assign(jnts_pos_);
+  command_assign();
   for (const auto& leg : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
     leg_ifaces_[leg]->legTarget(*leg_cmds_[leg]);
     leg_ifaces_[leg]->move();
@@ -376,10 +379,10 @@ void Walk::on_ground(const LegType& l) {
   foots_pos_[l].z() = foots_pos_[l].z() - err;
   // foots_pos_.lf.z = foots_pos_.lf.z - err;
   // pos << foots_pos_.lf.x, foots_pos_.lf.y, foots_pos_.lf.z;
-  __kinematics(foots_pos_[l], -1, jnt);
-  jnts_pos_.lf.pitch = jnt(JntType::YAW);
-  jnts_pos_.lf.hip   = jnt(JntType::HIP);
-  jnts_pos_.lf.knee  = jnt(JntType::KNEE);
+  __kinematics(foots_pos_[l], -1, jnts_pos_[LegType::FL]);
+//  jnts_pos_.lf.pitch = jnt(JntType::YAW);
+//  jnts_pos_.lf.hip   = jnt(JntType::HIP);
+//  jnts_pos_.lf.knee  = jnt(JntType::KNEE);
 }
 
 void Walk::cog_swing(const _Position& Adj, const LegType& leg) {
@@ -454,43 +457,50 @@ void Walk::walk() {
 /*************************************************************************************************************/
 void Walk::forward_kinematics()
 {
-  Eigen::VectorXd lf(3), rf(3), lb(3), rb(3);
-  lf(JntType::YAW) = jnts_pos_.lf.pitch; lf(JntType::HIP) = jnts_pos_.lf.hip; lf(JntType::KNEE) = jnts_pos_.lf.knee;
-  rf(JntType::YAW) = jnts_pos_.rf.pitch; rf(JntType::HIP) = jnts_pos_.rf.hip; rf(JntType::KNEE) = jnts_pos_.rf.knee;
-  lb(JntType::YAW) = jnts_pos_.lb.pitch; lb(JntType::HIP) = jnts_pos_.lb.hip; lb(JntType::KNEE) = jnts_pos_.lb.knee;
-  rb(JntType::YAW) = jnts_pos_.rb.pitch; rb(JntType::HIP) = jnts_pos_.rb.hip; rb(JntType::KNEE) = jnts_pos_.rb.knee;
-  Eigen::Vector3d olf, orf, olb, orb;
-  __formula(lf, foots_pos_[LegType::FL]);
-  __formula(rf, foots_pos_[LegType::FR]);
-  __formula(lb, foots_pos_[LegType::HL]);
-  __formula(rb, foots_pos_[LegType::HR]);
+  for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
+    __formula(jnts_pos_[l], foots_pos_[l]);
+  }
+//  Eigen::VectorXd lf(3), rf(3), lb(3), rb(3);
+//  lf(JntType::YAW) = jnts_pos_.lf.pitch; lf(JntType::HIP) = jnts_pos_.lf.hip; lf(JntType::KNEE) = jnts_pos_.lf.knee;
+//  rf(JntType::YAW) = jnts_pos_.rf.pitch; rf(JntType::HIP) = jnts_pos_.rf.hip; rf(JntType::KNEE) = jnts_pos_.rf.knee;
+//  lb(JntType::YAW) = jnts_pos_.lb.pitch; lb(JntType::HIP) = jnts_pos_.lb.hip; lb(JntType::KNEE) = jnts_pos_.lb.knee;
+//  rb(JntType::YAW) = jnts_pos_.rb.pitch; rb(JntType::HIP) = jnts_pos_.rb.hip; rb(JntType::KNEE) = jnts_pos_.rb.knee;
+//  Eigen::Vector3d olf, orf, olb, orb;
+//  __formula(lf, foots_pos_[LegType::FL]);
+//  __formula(rf, foots_pos_[LegType::FR]);
+//  __formula(lb, foots_pos_[LegType::HL]);
+//  __formula(rb, foots_pos_[LegType::HR]);
 }
 
 void Walk::reverse_kinematics() {
-  Eigen::VectorXd jnt((int)JntType::N_JNTS);
-  leg_ifaces_[LegType::FL]->inverseKinematics(foots_pos_[LegType::FL], jnt);
-  // __kinematics(pos, -1, jnt);
-  jnts_pos_.lf.pitch = jnt(JntType::YAW);
-  jnts_pos_.lf.hip   = jnt(JntType::HIP);
-  jnts_pos_.lf.knee  = jnt(JntType::KNEE);
+  for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
+    leg_ifaces_[l]->inverseKinematics(foots_pos_[l], jnts_pos_[l]);
+  }
 
-  leg_ifaces_[LegType::FR]->inverseKinematics(foots_pos_[LegType::FR], jnt);
-  // __kinematics(pos, -1, jnt);
-  jnts_pos_.rf.pitch = jnt(JntType::YAW);
-  jnts_pos_.rf.hip   = jnt(JntType::HIP);
-  jnts_pos_.rf.knee  = jnt(JntType::KNEE);
-
-  leg_ifaces_[LegType::HL]->inverseKinematics(foots_pos_[LegType::HL], jnt);
-  // __kinematics(pos, 1, jnt);
-  jnts_pos_.lb.pitch = jnt(JntType::YAW);
-  jnts_pos_.lb.hip   = jnt(JntType::HIP);
-  jnts_pos_.lb.knee  = jnt(JntType::KNEE);
-
-  leg_ifaces_[LegType::HR]->inverseKinematics(foots_pos_[LegType::HR], jnt);
-  // __kinematics(pos, 1, jnt);
-  jnts_pos_.rb.pitch = jnt(JntType::YAW);
-  jnts_pos_.rb.hip   = jnt(JntType::HIP);
-  jnts_pos_.rb.knee  = jnt(JntType::KNEE);
+//  Eigen::VectorXd jnt((int)JntType::N_JNTS);
+//  leg_ifaces_[LegType::FL]->inverseKinematics(foots_pos_[LegType::FL], jnt);
+//  // __kinematics(pos, -1, jnt);
+//  jnts_pos_.lf.pitch = jnt(JntType::YAW);
+//  jnts_pos_.lf.hip   = jnt(JntType::HIP);
+//  jnts_pos_.lf.knee  = jnt(JntType::KNEE);
+//
+//  leg_ifaces_[LegType::FR]->inverseKinematics(foots_pos_[LegType::FR], jnt);
+//  // __kinematics(pos, -1, jnt);
+//  jnts_pos_.rf.pitch = jnt(JntType::YAW);
+//  jnts_pos_.rf.hip   = jnt(JntType::HIP);
+//  jnts_pos_.rf.knee  = jnt(JntType::KNEE);
+//
+//  leg_ifaces_[LegType::HL]->inverseKinematics(foots_pos_[LegType::HL], jnt);
+//  // __kinematics(pos, 1, jnt);
+//  jnts_pos_.lb.pitch = jnt(JntType::YAW);
+//  jnts_pos_.lb.hip   = jnt(JntType::HIP);
+//  jnts_pos_.lb.knee  = jnt(JntType::KNEE);
+//
+//  leg_ifaces_[LegType::HR]->inverseKinematics(foots_pos_[LegType::HR], jnt);
+//  // __kinematics(pos, 1, jnt);
+//  jnts_pos_.rb.pitch = jnt(JntType::YAW);
+//  jnts_pos_.rb.hip   = jnt(JntType::HIP);
+//  jnts_pos_.rb.knee  = jnt(JntType::KNEE);
 
 }
 
@@ -529,22 +539,26 @@ _Position Walk::get_stance_velocity(_Position Adj_vec, unsigned int Loop) {
   return stance_vel;
 }
 
-void Walk::command_assign(const Angle& pos) {
-  leg_cmds_[LegType::FL]->target(JntType::YAW)  = pos.lf.pitch;
-  leg_cmds_[LegType::FL]->target(JntType::HIP)  = pos.lf.hip;
-  leg_cmds_[LegType::FL]->target(JntType::KNEE) = pos.lf.knee;
-
-  leg_cmds_[LegType::FR]->target(JntType::YAW)  = pos.rf.pitch;
-  leg_cmds_[LegType::FR]->target(JntType::HIP)  = pos.rf.hip;
-  leg_cmds_[LegType::FR]->target(JntType::KNEE) = pos.rf.knee;
-
-  leg_cmds_[LegType::HL]->target(JntType::YAW)  = pos.lb.pitch;
-  leg_cmds_[LegType::HL]->target(JntType::HIP)  = pos.lb.hip;
-  leg_cmds_[LegType::HL]->target(JntType::KNEE) = pos.lb.knee;
-
-  leg_cmds_[LegType::HR]->target(JntType::YAW)  = pos.rb.pitch;
-  leg_cmds_[LegType::HR]->target(JntType::HIP)  = pos.rb.hip;
-  leg_cmds_[LegType::HR]->target(JntType::KNEE) = pos.rb.knee;
+void Walk::command_assign() {
+  for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
+    leg_cmds_[l]->target = jnts_pos_[l];
+  }
+//
+//  leg_cmds_[LegType::FL]->target(JntType::YAW)  = pos.lf.pitch;
+//  leg_cmds_[LegType::FL]->target(JntType::HIP)  = pos.lf.hip;
+//  leg_cmds_[LegType::FL]->target(JntType::KNEE) = pos.lf.knee;
+//
+//  leg_cmds_[LegType::FR]->target(JntType::YAW)  = pos.rf.pitch;
+//  leg_cmds_[LegType::FR]->target(JntType::HIP)  = pos.rf.hip;
+//  leg_cmds_[LegType::FR]->target(JntType::KNEE) = pos.rf.knee;
+//
+//  leg_cmds_[LegType::HL]->target(JntType::YAW)  = pos.lb.pitch;
+//  leg_cmds_[LegType::HL]->target(JntType::HIP)  = pos.lb.hip;
+//  leg_cmds_[LegType::HL]->target(JntType::KNEE) = pos.lb.knee;
+//
+//  leg_cmds_[LegType::HR]->target(JntType::YAW)  = pos.rb.pitch;
+//  leg_cmds_[LegType::HR]->target(JntType::HIP)  = pos.rb.hip;
+//  leg_cmds_[LegType::HR]->target(JntType::KNEE) = pos.rb.knee;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

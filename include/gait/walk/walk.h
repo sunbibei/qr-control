@@ -59,7 +59,7 @@ protected:
   int64_t         sum_interval_;
   ///!
   Eigen::Vector3d foots_pos_[LegType::N_LEGS];
-  Eigen::VectorXd jnts_pos1_[LegType::N_LEGS];
+  Eigen::VectorXd jnts_pos_ [LegType::N_LEGS];
 
   Eigen::Vector3d last_foot_pos_;
   Eigen::Vector3d next_foot_pos_;
@@ -110,7 +110,7 @@ private:
 private:
   void forward_kinematics();
 
-  void command_assign(const Angle&);
+  void command_assign();
 
   _Position get_stance_velocity(_Position Adj_vec, unsigned int Loop);
 
@@ -121,8 +121,6 @@ protected:
   // boost::scoped_ptr<realtime_tools::RealtimePublisher<std_msgs::Float64MultiArray>> joint_state_publisher_;
 private:
   int Loop_Count;
-
-  Angle jnts_pos_ = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
 
   _Position Cog_adj;
   _Position swing_adj_CoG;
