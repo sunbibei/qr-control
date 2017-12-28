@@ -43,8 +43,6 @@ set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
                       ${SRC_GAITS_ROOT}/agent/rl_agent.cpp
 
                       ${SRC_GAITS_ROOT}/walk/walk.cpp
-                      ${SRC_GAITS_ROOT}/walk/math.cpp
-                      ${SRC_GAITS_ROOT}/walk/swing.cpp
 )
 
 set(ROBOT_FILES       ${SRC_RO_LEG_ROOT}/data_leg.cpp
