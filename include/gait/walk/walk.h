@@ -59,6 +59,10 @@ protected:
   int64_t         sum_interval_;
   ///!
   Eigen::Vector3d foots_pos_[LegType::N_LEGS];
+  Eigen::VectorXd jnts_pos1_[LegType::N_LEGS];
+
+  Eigen::Vector3d last_foot_pos_;
+  Eigen::Vector3d next_foot_pos_;
 
 
 ///! These variable is temporary.
@@ -119,13 +123,8 @@ private:
   int Loop_Count;
 
   Angle jnts_pos_ = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
-  Position foots_pos1_ = { {0, 0, -L0 - L1 - L2},
-                          {0, 0, -L0 - L1 - L2},
-                          {0, 0, -L0 - L1 - L2},
-                          {0, 0, -L0 - L1 - L2}};
 
-  _Position Desired_Foot_Pos = {0,0,0};
-  _Position Pos_start,Cog_adj;
+  _Position Cog_adj;
   _Position swing_adj_CoG;
 
 };

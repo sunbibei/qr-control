@@ -289,29 +289,8 @@ void Walk::hang_walk() {
 }
 
 void Walk::next_foot_pt() {
-  Pos_start.x = foots_pos_[swing_leg_].x();
-  Pos_start.y = foots_pos_[swing_leg_].y();
-  Pos_start.z = foots_pos_[swing_leg_].z();
-  switch(swing_leg_)
-  {
-    case LegType::FL:
-      // Pos_start = foots_pos_.lf;
-      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
-      break;
-    case LegType::FR:
-      // Pos_start = foots_pos_.rf;
-      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
-      break;
-    case LegType::HL:
-      // Pos_start = foots_pos_.lb;
-      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
-      break;
-    case LegType::HR:
-      // Pos_start = foots_pos_.rb;
-      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
-      break;
-    default:break;
-  }
+  last_foot_pos_ = foots_pos_[swing_leg_];
+  next_foot_pos_ << Foot_Steps, last_foot_pos_.y(), -Stance_Height;
 }
 
 void Walk::move_cog() {
@@ -367,15 +346,8 @@ void Walk::swing_leg(const LegType& leg) {
       // Leg_On_Ground = foot_contact1->singleFootContactStatus(leg);
     }
     if (LegState::AIR_STATE == _td) {
-      Eigen::Vector3d p0, p1;
-      p0 << Pos_start.x, Pos_start.y, Pos_start.z;
-      p1 << Desired_Foot_Pos.x, Desired_Foot_Pos.y, Desired_Foot_Pos.z;
-      __cycloid_position(p0, p1, Loop_Count, Swing_Num, Swing_Height, s);
-      s1.x = s(0); s1.y = s(1); s1.z = s(2);
-      // foot_vel = swing->compoundCycloidVelocity(Pos_start, Desired_Foot_Pos, Loop_Count, Swing_Num, Swing_Height);
-
-      _Position tmp = Pos_start + s1;
-      foots_pos_[leg] << tmp.x, tmp.y, tmp.z;
+      __cycloid_position(last_foot_pos_, next_foot_pos_, Loop_Count, Swing_Num, Swing_Height, s);
+      foots_pos_[leg] = last_foot_pos_ + s;
     }
 
     // cog moving
