@@ -31,6 +31,8 @@ public:
    * @param quaternion  [out]  The current quaternion related to the base frame.
    */
   virtual void forwardKinematics(Eigen::Vector3d&, Eigen::Quaterniond&) = 0;
+  virtual void forwardKinematics(Eigen::Quaterniond&) = 0;
+  virtual void forwardKinematics(Eigen::Vector3d&)    = 0;
   /*!
    * @brief The inverse kinematic solution, given the target of foot pose.
    * @param translation [in]  The target of the translation from the base frame.
@@ -39,7 +41,7 @@ public:
    * @return Return true, if everything is OK, or return false.
    */
   virtual void inverseKinematics(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) = 0;
-  virtual void inverseKinematics(const Eigen::Vector3d&,   EVX& angle) = 0;
+  virtual void inverseKinematics(const Eigen::Vector3d&,   EVX& angle)  = 0;
   virtual void inverseKinematics(const Eigen::Quaterniond&, EVX& angle) = 0;
 
   ///! need to delete

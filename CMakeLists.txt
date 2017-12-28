@@ -41,7 +41,6 @@ set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
                       ${SRC_GAITS_ROOT}/creep/creep.cpp
                       ${SRC_GAITS_ROOT}/test/test_traj.cpp
                       ${SRC_GAITS_ROOT}/agent/rl_agent.cpp
-
                       ${SRC_GAITS_ROOT}/walk/walk.cpp
 )
 

@@ -22,13 +22,14 @@ namespace qr_control {
     leg_ifaces_[LegType::HR]->joint_position_const_ref()
 
 #define PRINT_PARAM_TARGET_POS \
-    leg_cmds_[LegType::FL]->target, \
-    leg_cmds_[LegType::FR]->target, \
-    leg_cmds_[LegType::HL]->target, \
-    leg_cmds_[LegType::HR]->target
+    jnts_pos_[LegType::FL], \
+    jnts_pos_[LegType::FR], \
+    jnts_pos_[LegType::HL], \
+    jnts_pos_[LegType::HR]
 
 #define PRINT_CURRENT_POS   __print_positions(PRINT_PARAM_CURRENT_POS);
 #define PRINT_POS_VS_TARGET __print_positions(PRINT_PARAM_CURRENT_POS, PRINT_PARAM_TARGET_POS);
+#define PRINT_COMMAND       __print_command(jnts_pos_);
 
 ///! These are the inline functions forward declare.
 void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
@@ -39,24 +40,57 @@ void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
     const Eigen::VectorXd& tfl, const Eigen::VectorXd& tfr,
     const Eigen::VectorXd& thl, const Eigen::VectorXd& thr);
 
-void __print_command(const LegTarget*);
+void __print_command(const Eigen::VectorXd*);
 void __cycloid_position(
       const Eigen::Vector3d&, const Eigen::Vector3d&, int, int, int, Eigen::Vector3d&);
+
 void __cross_point(
     const Eigen::Vector2d& p0_0, const Eigen::Vector2d& p0_1,
     const Eigen::Vector2d& p1_0, const Eigen::Vector2d& p1_1,
     Eigen::Vector2d&);
-void __kinematics(const Eigen::Vector3d& pos, int Sgn, Eigen::VectorXd& jnt);
-void __formula(const Eigen::VectorXd&, Eigen::Vector3d&);
-double __inscribed_circle_radius(const Eigen::Vector3d&, const Eigen::Vector3d&, const Eigen::Vector3d&);
-Eigen::Vector3d __inner_heart(const Eigen::Vector3d&, const Eigen::Vector3d&, const Eigen::Vector3d&);
-Eigen::Vector3d __line_section(const Eigen::Vector3d& A, const Eigen::Vector3d& B, double ratio);
 
+double __inscribed_circle_radius(
+    const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
+
+Eigen::Vector2d __inner_heart(
+    const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
+
+Eigen::Vector2d __line_section(
+    const Eigen::Vector2d& A, const Eigen::Vector2d& B, double ratio);
+
+struct WalkCoeff {
+  ///! The threshold for cog
+  double THRES_COG;
+  ///! The foot step
+  double FOOT_STEP;
+  ///! The height value when the robot stay stance.
+  double STANCE_HEIGHT;
+  ///! The time for stance
+  int    STANCE_TIME;
+  ///! The height value when swing leg.
+  double SWING_HEIGHT;
+  ///! The time for swing leg
+  int    SWING_TIME;
+
+  WalkCoeff(const MiiString& _tag)
+    : THRES_COG(6.5),    FOOT_STEP(10),
+      STANCE_HEIGHT(46), STANCE_TIME(10),
+      SWING_HEIGHT(5),   SWING_TIME(30) {
+    auto cfg = MiiCfgReader::instance();
+    cfg->get_value(_tag, "cog_threshold", THRES_COG);
+    cfg->get_value(_tag, "step",     FOOT_STEP);
+    cfg->get_value(_tag, "stance_height",STANCE_HEIGHT);
+    cfg->get_value(_tag, "stance_time",  STANCE_TIME);
+    cfg->get_value(_tag, "swing_height", SWING_HEIGHT);
+    cfg->get_value(_tag, "swing_time",   SWING_TIME);
+  }
+};
 
 Walk::Walk()
   : current_state_(WalkState::UNKNOWN_WK_STATE),
-    state_machine_(nullptr), is_hang_walk_(false),
-    tick_interval_(50), sum_interval_(0),
+    state_machine_(nullptr), body_iface_(nullptr),
+    is_hang_walk_(false), tick_interval_(50),
+    sum_interval_(0), coeff_(nullptr),
     /* These variables are the private. */
     timer_(nullptr), is_send_init_cmds_(false),
     internal_order_(0), swing_leg_(LegType::HL)
@@ -66,6 +100,9 @@ Walk::Walk()
 
   for (auto& c : leg_cmds_)
     c = nullptr;
+
+  for (auto& j : jnts_pos_)
+    j.resize(JntType::N_JNTS);
 
   Loop_Count = 0;
 }
@@ -98,16 +135,15 @@ bool Walk::init() {
 
   current_state_ = WalkState::WK_INIT_POSE;
 
-  // TODO
   auto cfg = MiiCfgReader::instance();
   cfg->get_value(getLabel(), "hang",     is_hang_walk_);
   cfg->get_value(getLabel(), "interval", tick_interval_);
 
+  MiiString label;
   int count      = 0;
   LegType leg    = LegType::UNKNOWN_LEG;
-  MiiString _tag = Label::make_label(getLabel(), "interface_" + std::to_string(count));
+  MiiString _tag = Label::make_label(getLabel(), "leg_iface_" + std::to_string(count));
   while (cfg->get_value(_tag, "leg", leg)) {
-    MiiString label;
     cfg->get_value_fatal(_tag, "label", label);
     auto iface = Label::getHardwareByName<QrLeg>(label);
     if (nullptr == iface) {
@@ -120,7 +156,16 @@ bool Walk::init() {
       leg_cmds_[leg]->target.fill(0.0);
     }
 
-    _tag = Label::make_label(getLabel(), "interface_" + std::to_string(++count));
+    _tag = Label::make_label(getLabel(), "leg_iface_" + std::to_string(++count));
+  }
+
+  _tag = Label::make_label(getLabel(), "body_iface");
+  cfg->get_value_fatal(_tag, "label", label);
+  auto iface = Label::getHardwareByName<QrBody>(label);
+  if (nullptr == iface) {
+    LOG_FATAL << "No such named '" << label << "' interface of body.";
+  } else {
+    body_iface_ = iface;
   }
 
   if (false) {
@@ -128,7 +173,11 @@ bool Walk::init() {
     LOG_INFO << "get interface(LegType::FR): " << leg_ifaces_[LegType::FR];
     LOG_INFO << "get interface(LegType::HL): " << leg_ifaces_[LegType::HL];
     LOG_INFO << "get interface(LegType::HR): " << leg_ifaces_[LegType::HR];
+    LOG_INFO << "get interface(Body):        " << body_iface_;
   }
+
+  _tag = Label::make_label(getLabel(), "coefficient");
+  coeff_ = new WalkCoeff(_tag);
 
 //  joint_state_publisher_.reset( new realtime_tools::RealtimePublisher<
 //    std_msgs::Float64MultiArray>(n, "/dragon/joint_commands", 10));
@@ -179,17 +228,18 @@ void Walk::checkState() {
 StateMachineBase* Walk::state_machine() { return state_machine_; }
 
 void Walk::prev_tick() {
-  // TODO
   // gesture->updateImuData(imu_quat_[0], imu_quat_[1], imu_quat_[2]);
 }
 
 void Walk::post_tick() {
   // std::cout << "Walk::post_tick()" << std::endl;
-  command_assign(jnts_pos_);
+  // command_assign();
   for (const auto& leg : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-    leg_ifaces_[leg]->legTarget(*leg_cmds_[leg]);
+    leg_ifaces_[leg]->legTarget(JntCmdType::CMD_POS, jnts_pos_[leg]);
     leg_ifaces_[leg]->move();
   }
+
+  PRINT_COMMAND
 }
 
 void Walk::waiting() {
@@ -199,29 +249,17 @@ void Walk::waiting() {
 
 void Walk::pose_init() {
   if (!is_send_init_cmds_) {
-    foots_pos_.rb.z = -Stance_Height;
-    foots_pos_.lb.z = -Stance_Height;
-    foots_pos_.rf.z = -Stance_Height;
-    foots_pos_.lf.z = -Stance_Height;
-
-    foots_pos_.lf.y = 0;
-    foots_pos_.rf.y = 0;
-    foots_pos_.lb.y = 0;
-    foots_pos_.rb.y = 0;
-
-    foots_pos_.lf.x = 0;
-    foots_pos_.rf.x = 0;
-    foots_pos_.lb.x = 0;
-    foots_pos_.rb.x = 0;
+    for (auto& f : foots_pos_) {
+      f << 0, 0, -coeff_->STANCE_HEIGHT;
+    }
     reverse_kinematics();
   }
 
   is_send_init_cmds_ = true;
   PRINT_POS_VS_TARGET
-
 }
 
-LegType Walk::choice_next_leg(const LegType curr) {
+LegType Walk::next_leg(const LegType curr) {
   switch (curr) {
   case LegType::FL: return LegType::HR;
   case LegType::FR: return LegType::HL;
@@ -244,7 +282,7 @@ void Walk::hang_walk() {
       break;
     case 2:
       move_cog();
-      if(Loop_Count>=Stance_Num)
+      if(Loop_Count >= coeff_->STANCE_TIME)
       {
         Loop_Count = 0;
         internal_order_=3;
@@ -254,13 +292,13 @@ void Walk::hang_walk() {
       break;
     case 3: //swing leg
       swing_leg(swing_leg_);
-      if (Loop_Count >= Swing_Num) {
+      if (Loop_Count >= coeff_->SWING_TIME) {
         // std::cout<<"flow_control: swing done"<<std::endl;
         Loop_Count = 0;
 
         internal_order_ = 2;
 
-        swing_leg_ = choice_next_leg(swing_leg_);
+        swing_leg_ = next_leg(swing_leg_);
         // Leg_Order = (Leg_Order>1)?Leg_Order-2:3-Leg_Order;
         LOG_WARNING << "*******----case 4----*******";
       }
@@ -274,125 +312,91 @@ void Walk::hang_walk() {
 }
 
 void Walk::next_foot_pt() {
-  switch(swing_leg_)
-  {
-    case LegType::FL:
-      Pos_start = foots_pos_.lf;
-      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
-      break;
-    case LegType::FR:
-      Pos_start = foots_pos_.rf;
-      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
-      break;
-    case LegType::HL:
-      Pos_start = foots_pos_.lb;
-      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
-      break;
-    case LegType::HR:
-      Pos_start = foots_pos_.rb;
-      Desired_Foot_Pos.assign(Foot_Steps, Pos_start.y, -Stance_Height);
-      break;
-    default:break;
-  }
+  last_foot_pos_ = foots_pos_[swing_leg_];
+  next_foot_pos_ << coeff_->FOOT_STEP, last_foot_pos_.y(), -coeff_->STANCE_HEIGHT;
 }
 
 void Walk::move_cog() {
-  _Position adj = {0,0,0};
-
-  if (Loop_Count <= 1)
-  {
-    Cog_adj = get_CoG_adj_vec(Desired_Foot_Pos, swing_leg_);
-    // std::cout<<"CoG adjust vector:"<<Cog_adj.x<<", "<<Cog_adj.y<<std::endl;
+  if (Loop_Count <= 1) {
+    delta_cog_ = delta_cog(swing_leg_);
     if ((LegType::FL == swing_leg_) || (LegType::FR == swing_leg_))
-      Stance_Num = 1;
+      coeff_->STANCE_TIME = 1;
     else
-      Stance_Num = 50;
+      coeff_->STANCE_TIME = 50;
   }
 
-  adj = get_stance_velocity(Cog_adj, Loop_Count);
-  // std::cout<<"cog_adj h_adj_step:";
-
-
-  cog_pos_assign(adj);
+  cog_pos_assign(stance_velocity(delta_cog_, Loop_Count));
   reverse_kinematics();
-  // std::cout<<"cog_adj after: Pos_ptr.z:"<<foots_pos_.lf.z<<" "<<foots_pos_.rf.z<<" "<<foots_pos_.lb.z<<" "<<foots_pos_.rb.z<<" "<<std::endl;
 }
 
-_Position Walk::get_CoG_adj_vec(const _Position& Next_Foothold, LegType leg) {
-  _Position crosspoint1;
+Eigen::Vector2d Walk::delta_cog(LegType leg) {
   Eigen::Vector2d _cs, _p0, _p1, _p2, _p3;
+  Eigen::Vector3d _s;
   switch (leg)
   {
     case LegType::FL:
     case LegType::HL:
       // TODO
-      _p0 << (foots_pos_.lf + shoulder_.lf).x, (foots_pos_.lf + shoulder_.lf).y;
-      _p1 << (foots_pos_.rb + shoulder_.rb).x, (foots_pos_.rb + shoulder_.rb).y;
-      _p2 << (foots_pos_.rf + shoulder_.rf).x, (foots_pos_.rf + shoulder_.rf).y;
-      _p3 << (foots_pos_.lb + shoulder_.lb).x, (foots_pos_.lb + shoulder_.lb).y;
-      __cross_point(_p0, _p1, _p2, _p3, _cs);
-      crosspoint1.x = _cs.x(); crosspoint1.y = _cs.y(); crosspoint1.z = 0;
-      return innerTriangle(crosspoint1,
-          foots_pos_.rf + shoulder_.rf,
-          foots_pos_.rb + shoulder_.rb);
+      body_iface_->leg_base(LegType::FL, _s);
+      _p0 = (foots_pos_[LegType::FL] + _s).head(2);
+
+      body_iface_->leg_base(LegType::HR, _s);
+      _p1 = (foots_pos_[LegType::HR] + _s).head(2);
+
+      body_iface_->leg_base(LegType::FR, _s);
+      _p2 = (foots_pos_[LegType::FR] + _s).head(2);
+
+      body_iface_->leg_base(LegType::HL, _s);
+      _p3 = (foots_pos_[LegType::HL] + _s).head(2);
+      break;
     case LegType::FR:
     case LegType::HR:
-      _p2 << (foots_pos_.lf + shoulder_.lf).x, (foots_pos_.lf + shoulder_.lf).y;
-      _p3 << (foots_pos_.rb + shoulder_.rb).x, (foots_pos_.rb + shoulder_.rb).y;
-      _p0 << (foots_pos_.rf + shoulder_.rf).x, (foots_pos_.rf + shoulder_.rf).y;
-      _p1 << (foots_pos_.lb + shoulder_.lb).x, (foots_pos_.lb + shoulder_.lb).y;
-      __cross_point(_p0, _p1, _p2, _p3, _cs);
-      crosspoint1.x = _cs.x(); crosspoint1.y = _cs.y(); crosspoint1.z = 0;
-      return innerTriangle(crosspoint1,
-          foots_pos_.lf + shoulder_.lf,
-          foots_pos_.lb + shoulder_.lb);
+      body_iface_->leg_base(LegType::FL, _s);
+      _p2 = (foots_pos_[LegType::FL] + _s).head(2);
+
+      body_iface_->leg_base(LegType::HR, _s);
+      _p3 = (foots_pos_[LegType::HR] + _s).head(2);
+
+      body_iface_->leg_base(LegType::FR, _s);
+      _p0 = (foots_pos_[LegType::FR] + _s).head(2);
+
+      body_iface_->leg_base(LegType::HL, _s);
+      _p1 = (foots_pos_[LegType::HL] + _s).head(2);
+      break;
+    default:
+      LOG_WARNING << "What fucking code with LEG!";
+      return Eigen::Vector2d(0.0, 0.0);
   }
+
+  __cross_point(_p0, _p1, _p2, _p3, _cs);
+  return inner_triangle(_cs, _p2, _p1);
 }
 
 void Walk::swing_leg(const LegType& leg) {
   EV3 foot_vel(0,0,0),joint_vel(0,0,0),joint_pos(0,0,0);
-  _Position s1 = {0,0,0};
   Eigen::Vector3d s;
+  Eigen::Vector2d s2d;
   LegState _td = LegState::AIR_STATE;
 
-  if(Loop_Count <= Swing_Num) {
-    if(Loop_Count > Swing_Num/3*2) {
+  if(Loop_Count <= coeff_->SWING_TIME) {
+    if(Loop_Count > coeff_->SWING_TIME/3*2) {
       _td = leg_ifaces_[leg]->leg_state();
       // Leg_On_Ground = foot_contact1->singleFootContactStatus(leg);
     }
     if (LegState::AIR_STATE == _td) {
-      Eigen::Vector3d p0, p1;
-      p0 << Pos_start.x, Pos_start.y, Pos_start.z;
-      p1 << Desired_Foot_Pos.x, Desired_Foot_Pos.y, Desired_Foot_Pos.z;
-      __cycloid_position(p0, p1, Loop_Count, Swing_Num, Swing_Height, s);
-      s1.x = s(0); s1.y = s(1); s1.z = s(2);
-      // foot_vel = swing->compoundCycloidVelocity(Pos_start, Desired_Foot_Pos, Loop_Count, Swing_Num, Swing_Height);
-
-      switch(leg)
-      {
-        case LegType::FL:
-          foots_pos_.lf = Pos_start + s1;
-        break;
-        case LegType::FR:
-          foots_pos_.rf = Pos_start + s1;
-        break;
-        case LegType::HL:
-          foots_pos_.lb = Pos_start + s1;
-        break;
-        case LegType::HR:
-          foots_pos_.rb = Pos_start + s1;
-        break;
-        default:break;
-      }
+      __cycloid_position(last_foot_pos_, next_foot_pos_, Loop_Count, coeff_->SWING_TIME, coeff_->SWING_HEIGHT, s);
+      foots_pos_[leg] = last_foot_pos_ + s;
     }
 
     // cog moving
-    if(Loop_Count<=Swing_Num/3*2)
-    {
-      Stance_Num = Swing_Num/3*2;
-      s1 = get_stance_velocity(swing_adj_CoG, Loop_Count);
-      cog_swing(s1, leg);
-    }
+//    if(Loop_Count<=Swing_Num/3*2)
+//    {
+//      Stance_Num = Swing_Num/3*2;
+//      s2d = stance_velocity(swing_delta_cog_, Loop_Count);
+//      s1.x = s2d.x(); s1.y = s2d.y(); s1.z = 0;
+//      // s1 = get_stance_velocity(swing_adj_CoG, Loop_Count);
+//      cog_swing(s1, leg);
+//    }
   } else {
     _td = leg_ifaces_[leg]->leg_state();
     // Leg_On_Ground = foot_contact->singleFootContactStatus(leg);
@@ -407,79 +411,69 @@ void Walk::swing_leg(const LegType& leg) {
 
 void Walk::on_ground(const LegType& l) {
   double err = 0.1;
-  Eigen::Vector3d pos;
+  // Eigen::Vector3d pos;
   Eigen::VectorXd jnt((int)JntType::N_JNTS);
-  // jnt.resize;
-  switch (l)
-  {
-  case LegType::FL:
-    foots_pos_.lf.z = foots_pos_.lf.z - err;
-    pos << foots_pos_.lf.x, foots_pos_.lf.y, foots_pos_.lf.z;
-    __kinematics(pos, -1, jnt);
-    jnts_pos_.lf.pitch = jnt(JntType::YAW);
-    jnts_pos_.lf.hip   = jnt(JntType::HIP);
-    jnts_pos_.lf.knee  = jnt(JntType::KNEE);
-    // jnts_pos_.lf = math->cal_kinematics(foots_pos_.lf,-1);
-    break;
-  case LegType::FR:
-    foots_pos_.rf.z = foots_pos_.rf.z - err;
-    pos << foots_pos_.rf.x, foots_pos_.rf.y, foots_pos_.rf.z;
-    __kinematics(pos, -1, jnt);
-    jnts_pos_.rf.pitch = jnt(JntType::YAW);
-    jnts_pos_.rf.hip   = jnt(JntType::HIP);
-    jnts_pos_.rf.knee  = jnt(JntType::KNEE);
+  foots_pos_[l].z() = foots_pos_[l].z() - err;
+  // foots_pos_.lf.z = foots_pos_.lf.z - err;
+  // pos << foots_pos_.lf.x, foots_pos_.lf.y, foots_pos_.lf.z;
+  leg_ifaces_[l]->inverseKinematics(foots_pos_[l], jnts_pos_[LegType::FL]);
+  // __kinematics(foots_pos_[l], -1, jnts_pos_[LegType::FL]);
+//  jnts_pos_.lf.pitch = jnt(JntType::YAW);
+//  jnts_pos_.lf.hip   = jnt(JntType::HIP);
+//  jnts_pos_.lf.knee  = jnt(JntType::KNEE);
+}
 
-    // jnts_pos_.rf = math->cal_kinematics(foots_pos_.rf,-1);
-    break;
-  case LegType::HL:
-    foots_pos_.lb.z = foots_pos_.lb.z - err;
-    pos << foots_pos_.lb.x, foots_pos_.lb.y, foots_pos_.lb.z;
-    __kinematics(pos, -1, jnt);
-    jnts_pos_.lb.pitch = jnt(JntType::YAW);
-    jnts_pos_.lb.hip   = jnt(JntType::HIP);
-    jnts_pos_.lb.knee  = jnt(JntType::KNEE);
-    // jnts_pos_.lb = math->cal_kinematics(foots_pos_.lb, 1);
-    break;
-  case LegType::HR:
-    foots_pos_.rb.z = foots_pos_.rb.z - err;
-    pos << foots_pos_.rb.x, foots_pos_.rb.y, foots_pos_.rb.z;
-    __kinematics(pos, -1, jnt);
-    jnts_pos_.rb.pitch = jnt(JntType::YAW);
-    jnts_pos_.rb.hip   = jnt(JntType::HIP);
-    jnts_pos_.rb.knee  = jnt(JntType::KNEE);
-    // jnts_pos_.rb = math->cal_kinematics(foots_pos_.rb, 1);
-    break;
-  default:
-    LOG_ERROR << "What fucking LEG";
+Eigen::Vector2d Walk::inner_triangle(
+    const Eigen::Vector2d& _a, const Eigen::Vector2d& _b, const Eigen::Vector2d& _c) {
+  Eigen::Vector2d _init_cog(0.0, 0.0);
+  double ratio = 1;
+  double radius = __inscribed_circle_radius(_a, _b, _c);
+
+  auto iheart = __inner_heart(_a, _b, _c);
+  if ( radius > coeff_->THRES_COG) {
+    ratio = (radius - coeff_->THRES_COG)/radius;
+    auto _ia = __line_section(_a, iheart, ratio);
+    auto _ib = __line_section(_b, iheart, ratio);
+    auto _ic = __line_section(_c, iheart, ratio);
+
+    Eigen::Vector2d _cs1, _cs2;
+    __cross_point(_ia, _ib, _init_cog, iheart, _cs1);
+    __cross_point(_ia, _ic, _init_cog, iheart, _cs2);
+
+    if (_cs1.x() <= std::max(_ia.x(), _ib.x())
+      && _cs1.x() >= std::min(_ia.x(), _ib.x())) {
+        swing_delta_cog_ = (_ib.x() > _ic.x()) ? _ib - _cs1 : _ic - _cs1;
+        swing_delta_cog_ = swing_delta_cog_ / 2.0;
+        return _cs1;
+    }
+    if (_cs2.x() <= std::max(_ia.x(), _ic.x())
+      && _cs2.x() >= std::min(_ia.x(), _ic.x())) {
+      // std::cout<<"second_cross true"<<std::endl;
+      swing_delta_cog_ = (_ib.x() > _ic.x()) ? _ib - _cs2 : _ic - _cs2;
+      swing_delta_cog_ = swing_delta_cog_ / 2.0;
+      // return _cs2;
+    }
+    return _cs2;
+  } else {
+    return iheart;
   }
 }
 
-void Walk::cog_swing(const _Position& Adj, const LegType& leg) {
-  switch(leg)
-  {
-    case LegType::FL:
-      foots_pos_.rf = foots_pos_.rf - Adj;
-      foots_pos_.lb = foots_pos_.lb - Adj;
-      foots_pos_.rb = foots_pos_.rb - Adj;
-      break;
-    case LegType::FR:
-      foots_pos_.lf = foots_pos_.lf - Adj;
-      foots_pos_.lb = foots_pos_.lb - Adj;
-      foots_pos_.rb = foots_pos_.rb - Adj;
-      break;
-    case LegType::HL:
-      foots_pos_.lf = foots_pos_.lf - Adj;
-      foots_pos_.rf = foots_pos_.rf - Adj;
-      foots_pos_.rb = foots_pos_.rb - Adj;
-      break;
-    case LegType::HR:
-      foots_pos_.lf = foots_pos_.lf - Adj;
-      foots_pos_.rf = foots_pos_.rf - Adj;
-      foots_pos_.lb = foots_pos_.lb - Adj;
-      break;
-    default:break;
+Eigen::Vector2d Walk::stance_velocity(const Eigen::Vector2d& Adj_vec, unsigned int Loop) {
+  if (Loop > coeff_->STANCE_TIME) {
+    std::cout << "Loop:" << Loop << " Stance_Num:" << coeff_->STANCE_TIME << std::endl;
+    LOG_ERROR << ("Time Order wrong while stance");
   }
+  Eigen::Vector2d stance_vel(0.0, 0.0);
+  stance_vel.x() = 30 * Adj_vec.x() * pow(Loop,4) / pow(coeff_->STANCE_TIME, 5)
+      - 60 * Adj_vec.x() * pow(Loop,3) / pow(coeff_->STANCE_TIME, 4)
+      + 30 * Adj_vec.x() * pow(Loop,2) / pow(coeff_->STANCE_TIME, 3);
+  stance_vel.y() = 30 * Adj_vec.y() * pow(Loop,4) / pow(coeff_->STANCE_TIME, 5)
+      - 60 * Adj_vec.y() * pow(Loop,3) / pow(coeff_->STANCE_TIME, 4)
+      + 30 * Adj_vec.y() * pow(Loop,2) / pow(coeff_->STANCE_TIME, 3);
+  return stance_vel;
 }
+
 
 void Walk::walk() {
   // TODO
@@ -491,191 +485,25 @@ void Walk::walk() {
 /*************************************************************************************************************/
 void Walk::forward_kinematics()
 {
-  Eigen::VectorXd lf(3), rf(3), lb(3), rb(3);
-  lf(JntType::YAW) = jnts_pos_.lf.pitch; lf(JntType::HIP) = jnts_pos_.lf.hip; lf(JntType::KNEE) = jnts_pos_.lf.knee;
-  rf(JntType::YAW) = jnts_pos_.rf.pitch; rf(JntType::HIP) = jnts_pos_.rf.hip; rf(JntType::KNEE) = jnts_pos_.rf.knee;
-  lb(JntType::YAW) = jnts_pos_.lb.pitch; lb(JntType::HIP) = jnts_pos_.lb.hip; lb(JntType::KNEE) = jnts_pos_.lb.knee;
-  rb(JntType::YAW) = jnts_pos_.rb.pitch; rb(JntType::HIP) = jnts_pos_.rb.hip; rb(JntType::KNEE) = jnts_pos_.rb.knee;
-  Eigen::Vector3d olf, orf, olb, orb;
-  __formula(lf, olf);
-  __formula(rf, orf);
-  __formula(lb, olb);
-  __formula(rb, orb);
-  foots_pos_.lf.x = olf.x(); foots_pos_.lf.y = olf.y(); foots_pos_.lf.z = olf.z();
-  foots_pos_.rf.x = orf.x(); foots_pos_.rf.y = orf.y(); foots_pos_.rf.z = orf.z();
-  foots_pos_.lb.x = olb.x(); foots_pos_.lb.y = olb.y(); foots_pos_.lb.z = olb.z();
-  foots_pos_.rb.x = orb.x(); foots_pos_.lf.y = orb.y(); foots_pos_.rb.z = orb.z();
-
-//  foots_pos_.lf = math->cal_formula(jnts_pos_.lf);
-//foots_pos_.rf = math->cal_formula(jnts_pos_.rf);
-//foots_pos_.lb = math->cal_formula(jnts_pos_.lb);
-//foots_pos_.rb = math->cal_formula(jnts_pos_.rb);
+  for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
+    leg_ifaces_[l]->forwardKinematics(foots_pos_[l]);
+  }
 }
-
 
 void Walk::reverse_kinematics() {
-  Eigen::Vector3d pos;
-  Eigen::VectorXd jnt((int)JntType::N_JNTS);
-  pos << foots_pos_.lf.x, foots_pos_.lf.y, foots_pos_.lf.z;
-  __kinematics(pos, -1, jnt);
-  jnts_pos_.lf.pitch = jnt(JntType::YAW);
-  jnts_pos_.lf.hip   = jnt(JntType::HIP);
-  jnts_pos_.lf.knee  = jnt(JntType::KNEE);
-
-  pos << foots_pos_.rf.x, foots_pos_.rf.y, foots_pos_.rf.z;
-  __kinematics(pos, -1, jnt);
-  jnts_pos_.rf.pitch = jnt(JntType::YAW);
-  jnts_pos_.rf.hip   = jnt(JntType::HIP);
-  jnts_pos_.rf.knee  = jnt(JntType::KNEE);
-
-  pos << foots_pos_.lb.x, foots_pos_.lb.y, foots_pos_.lb.z;
-  __kinematics(pos, 1, jnt);
-  jnts_pos_.lb.pitch = jnt(JntType::YAW);
-  jnts_pos_.lb.hip   = jnt(JntType::HIP);
-  jnts_pos_.lb.knee  = jnt(JntType::KNEE);
-
-  pos << foots_pos_.rb.x, foots_pos_.rb.y, foots_pos_.rb.z;
-  __kinematics(pos, 1, jnt);
-  jnts_pos_.rb.pitch = jnt(JntType::YAW);
-  jnts_pos_.rb.hip   = jnt(JntType::HIP);
-  jnts_pos_.rb.knee  = jnt(JntType::KNEE);
-
-//jnts_pos_.lf = math->cal_kinematics(foots_pos_.lf,-1);
-//jnts_pos_.rf = math->cal_kinematics(foots_pos_.rf,-1);
-//jnts_pos_.lb = math->cal_kinematics(foots_pos_.lb, 1);
-//jnts_pos_.rb = math->cal_kinematics(foots_pos_.rb, 1);
-}
-
-_Position Walk::innerTriangle(const _Position &A, const _Position &B, const _Position &C) {
-  _Position innerheart, a_inner, b_inner, c_inner, first_cross, second_cross;
-  _Position cog_init(0,0,0);
-  double ratio = 1;
-  Eigen::Vector3d eA, eB, eC, eR;
-  eA << A.x, A.y, A.z; eB << B.x, B.y, B.z; eC << C.x, C.y, C.z;
-  double radius = __inscribed_circle_radius(eA, eB, eC);
-
-  // std::cout<<"inscribedCircleRadius:"<<radius<<std::endl;
-
-  eR = __inner_heart(eA, eB, eC);
-  innerheart.x = eR.x(); innerheart.y = eR.y(); innerheart.z = eR.z();
-  // std::cout<<"Inner heart:"<<innerheart.x<<","<<innerheart.y<<std::endl;
-
-  if(radius>cogThreshold)
-  {
-    ratio = (radius-cogThreshold)/radius;
-    eA = __line_section(eA, eR, ratio);
-    eB = __line_section(eB, eR, ratio);
-    eC = __line_section(eC, eR, ratio);
-
-    a_inner.x = eA.x(); a_inner.y = eA.y(); a_inner.z = eA.z();
-    b_inner.x = eB.x(); b_inner.y = eB.y(); b_inner.z = eB.z();
-    c_inner.x = eC.x(); c_inner.y = eC.y(); c_inner.z = eC.z();
-
-//    a_inner = math->formulaLineSection(A, innerheart, ratio);
-//    b_inner = math->formulaLineSection(B, innerheart, ratio);
-//    c_inner = math->formulaLineSection(C, innerheart, ratio);
-
-    Eigen::Vector2d _p0, _p1, _p2, _p3, _cs;
-    _p0 << a_inner.x, a_inner.y;
-    _p1 << b_inner.x, b_inner.y;
-    _p2 << cog_init.x, cog_init.y;
-    _p3 << innerheart.x, innerheart.y;
-    __cross_point(_p0, _p1, _p2, _p3, _cs);
-    first_cross.x = _cs.x(); first_cross.y = _cs.y(); first_cross.z = 0;
-
-    _p0 << a_inner.x, a_inner.y;
-    _p1 << c_inner.x, c_inner.y;
-    _p2 << cog_init.x, cog_init.y;
-    _p3 << innerheart.x, innerheart.y;
-    __cross_point(_p0, _p1, _p2, _p3, _cs);
-    second_cross.x = _cs.x(); second_cross.y = _cs.y(); second_cross.z = 0;
-    // first_cross = math->getCrossPoint(a_inner,b_inner,cog_init,innerheart);
-    // second_cross = math->getCrossPoint(a_inner,c_inner,cog_init,innerheart);
-
-    // std::cout<<"Ratio:"<<ratio<<std::endl;
-    // std::cout<<"A:"<<A.x<<","<<A.y<<" B:"<<B.x<<","<<B.y<<" C:"<<C.x<<","<<C.y<<std::endl;
-    // std::cout<<"a:"<<a_inner.x<<","<<a_inner.y<<" b:"<<b_inner.x<<","<<b_inner.y<<" c:"<<c_inner.x<<","<<c_inner.y<<std::endl;
-
-    // std::cout<<"first_cross:"<<first_cross.x<<","<<first_cross.y<<std::endl;
-    // std::cout<<"second_cross:"<<second_cross.x<<","<<second_cross.y<<std::endl;
-
-    if(first_cross.x<=max(a_inner.x, b_inner.x) && first_cross.x>=min(a_inner.x, b_inner.x))
-    {
-      // std::cout<<"first_cross true"<<std::endl;
-      swing_adj_CoG = (b_inner.x>c_inner.x) ? b_inner - first_cross : c_inner - first_cross;
-      swing_adj_CoG.x = swing_adj_CoG.x/2.0;
-      swing_adj_CoG.y = swing_adj_CoG.y/2.0;
-      // std::cout<<"swing_adj_CoG: "<<swing_adj_CoG.x <<" "<<swing_adj_CoG.y<<std::endl;
-      return first_cross;
-    }
-    if(second_cross.x<=max(a_inner.x, c_inner.x) && second_cross.x>=min(a_inner.x, c_inner.x))
-    {
-      // std::cout<<"second_cross true"<<std::endl;
-      swing_adj_CoG = (b_inner.x>c_inner.x) ? b_inner - second_cross : c_inner - second_cross;
-      swing_adj_CoG.x = swing_adj_CoG.x/2.0;
-      swing_adj_CoG.y = swing_adj_CoG.y/2.0;
-      // std::cout<<"swing_adj_CoG: "<<swing_adj_CoG.x <<" "<<swing_adj_CoG.y<<std::endl;
-      return second_cross;
-    }
-  }
-  else
-  {
-    return innerheart;
+  for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
+    leg_ifaces_[l]->inverseKinematics(foots_pos_[l], jnts_pos_[l]);
   }
 }
 
-void Walk::cog_pos_assign(_Position Adj) {
-  foots_pos_.lf = foots_pos_.lf - Adj;
-  foots_pos_.rf = foots_pos_.rf - Adj;
-  foots_pos_.lb = foots_pos_.lb - Adj;
-  foots_pos_.rb = foots_pos_.rb - Adj;
-}
-
-/**************************************************************************
- Author: WangShanren
- Date: 2017.2.24
- Description: after design the exact trajectory, providing velocity while move the body
- Input: CoG adjust Vector and Loop(1~)
- Output: realtime velocity
- Formula：(might as well think t1=0 and t2=Stance_Num to reduce calculation)
- X-axis:
- Vel(t):30 * XD * t^4 / Stance_Num^5 - 60 * XD * t^3 / Stance_Num^4 + 30 * XD * t^2 / Stance_Num^3
- Y-axis:
- Vel(t):30 * YD * t^4 / Stance_Num^5 - 60 * YD * t^3 / Stance_Num^4 + 30 * YD * t^2 / Stance_Num^3
- Meantime,XD,YD is the distance to the desired position,Stance_Num is the stance time for CoG adjusting
-**************************************************************************/
-_Position Walk::get_stance_velocity(_Position Adj_vec, unsigned int Loop) {
-  if(Loop>Stance_Num) {
-    std::cout<<"Loop:"<<Loop<<" Stance_Num:"<<Stance_Num<<std::endl;
-    LOG_ERROR << ("Time Order wrong while stance");
+void Walk::cog_pos_assign(const Eigen::Vector2d& _adj) {
+  Eigen::Vector3d _adj3d(_adj.x(), _adj.y(), 0);
+  for (auto& f : foots_pos_) {
+    f -= _adj3d;
   }
-  _Position stance_vel = {0,0,0};
-  stance_vel.x = 30 * Adj_vec.x * pow(Loop,4) / pow(Stance_Num,5)
-      - 60 * Adj_vec.x * pow(Loop,3) / pow(Stance_Num,4)
-      + 30 * Adj_vec.x * pow(Loop,2) / pow(Stance_Num,3);
-  stance_vel.y = 30 * Adj_vec.y * pow(Loop,4) / pow(Stance_Num,5)
-      - 60 * Adj_vec.y * pow(Loop,3) / pow(Stance_Num,4)
-      + 30 * Adj_vec.y * pow(Loop,2) / pow(Stance_Num,3);
-  return stance_vel;
 }
 
-void Walk::command_assign(const Angle& pos) {
-  leg_cmds_[LegType::FL]->target(JntType::YAW)  = pos.lf.pitch;
-  leg_cmds_[LegType::FL]->target(JntType::HIP)  = pos.lf.hip;
-  leg_cmds_[LegType::FL]->target(JntType::KNEE) = pos.lf.knee;
 
-  leg_cmds_[LegType::FR]->target(JntType::YAW)  = pos.rf.pitch;
-  leg_cmds_[LegType::FR]->target(JntType::HIP)  = pos.rf.hip;
-  leg_cmds_[LegType::FR]->target(JntType::KNEE) = pos.rf.knee;
-
-  leg_cmds_[LegType::HL]->target(JntType::YAW)  = pos.lb.pitch;
-  leg_cmds_[LegType::HL]->target(JntType::HIP)  = pos.lb.hip;
-  leg_cmds_[LegType::HL]->target(JntType::KNEE) = pos.lb.knee;
-
-  leg_cmds_[LegType::HR]->target(JntType::YAW)  = pos.rb.pitch;
-  leg_cmds_[LegType::HR]->target(JntType::HIP)  = pos.rb.hip;
-  leg_cmds_[LegType::HR]->target(JntType::KNEE) = pos.rb.knee;
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 ////////////        The implementation of inline methods         ////////////
@@ -730,28 +558,28 @@ void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
   printf("-------------------------------------------------------------------------------------\n");
 }
 
-void __print_command(const LegTarget** leg_cmds_) {
+void __print_command(const Eigen::VectorXd* leg_cmds_) {
   printf("_________________________________\n");
   printf("LEG -|   YAW  |   HIP  |  KNEE  |\n");
   printf("FL  -| %+01.04f| %+01.04f| %+01.04f|\n",
-      leg_cmds_[LegType::FL]->target(JntType::YAW),
-      leg_cmds_[LegType::FL]->target(JntType::HIP),
-      leg_cmds_[LegType::FL]->target(JntType::KNEE));
+      leg_cmds_[LegType::FL](JntType::YAW),
+      leg_cmds_[LegType::FL](JntType::HIP),
+      leg_cmds_[LegType::FL](JntType::KNEE));
 
   printf("FR  -| %+01.04f| %+01.04f| %+01.04f|\n",
-      leg_cmds_[LegType::FR]->target(JntType::YAW),
-      leg_cmds_[LegType::FR]->target(JntType::HIP),
-      leg_cmds_[LegType::FR]->target(JntType::KNEE));
+      leg_cmds_[LegType::FR](JntType::YAW),
+      leg_cmds_[LegType::FR](JntType::HIP),
+      leg_cmds_[LegType::FR](JntType::KNEE));
 
   printf("HL  -| %+01.04f| %+01.04f| %+01.04f|\n",
-      leg_cmds_[LegType::HL]->target(JntType::YAW),
-      leg_cmds_[LegType::HL]->target(JntType::HIP),
-      leg_cmds_[LegType::HL]->target(JntType::KNEE));
+      leg_cmds_[LegType::HL](JntType::YAW),
+      leg_cmds_[LegType::HL](JntType::HIP),
+      leg_cmds_[LegType::HL](JntType::KNEE));
 
   printf("HR  -| %+01.04f| %+01.04f| %+01.04f|\n",
-      leg_cmds_[LegType::HR]->target(JntType::YAW),
-      leg_cmds_[LegType::HR]->target(JntType::HIP),
-      leg_cmds_[LegType::HR]->target(JntType::KNEE));
+      leg_cmds_[LegType::HR](JntType::YAW),
+      leg_cmds_[LegType::HR](JntType::HIP),
+      leg_cmds_[LegType::HR](JntType::KNEE));
   printf("---------------------------------\n");
 }
 
@@ -765,9 +593,6 @@ void __cycloid_position(
     pos(2) = 2.0 * H * ((float)Loop/(float)T - 1.0/4.0/M_PI*sin(4.0*M_PI*Loop/T));
   else if(Loop<=T)
     pos(2) = 2.0 * H * ((float)(T-Loop)/(float)T - 1.0/4.0/M_PI*sin(4.0*M_PI*(T-Loop)/T));
-
-//  if(verbose)
-//    std::cout<<"Swing class:"<<p(0)<<" "<<p(1)<<" "<<p(2)<<std::endl;
 }
 
 void __cross_point(
@@ -801,31 +626,8 @@ void __cross_point(
   }
 }
 
-void __kinematics(const Eigen::Vector3d& pos, int Sgn, Eigen::VectorXd& jnt) {
-
-  double Delte = -pos.x();
-  jnt(JntType::YAW) = atan(-pos.y() / pos.z());
-
-  double Epsilon = L0 + pos.z() * cos(jnt(JntType::YAW)) - pos.y() * sin(jnt(JntType::YAW));
-  jnt(JntType::KNEE) = Sgn * acos((pow(Delte,2) + pow(Epsilon,2) - pow(L1,2) - pow(L2,2)) / 2.0 / L1 / L2);
-
-  double Phi = Delte + L2 * sin(jnt(JntType::KNEE));
-  if(Phi == 0)
-    Phi = Phi + 0.000001;
-
-  jnt(JntType::HIP) = 2 * atan((Epsilon + sqrt(pow(Epsilon,2) - Phi * (L2 * sin(jnt(JntType::KNEE)) - Delte))) / Phi);
-}
-
-void __formula(const Eigen::VectorXd& in, Eigen::Vector3d& out)
-{
-  out.x() = L1 * sin(in(JntType::HIP)) + L2 * sin(in(JntType::HIP) + in(JntType::KNEE));
-  out.y() = L0 * sin(in(JntType::YAW)) + L1 * sin(in(JntType::YAW)) * cos(in(JntType::HIP))
-      + L2 * sin(in(JntType::YAW)) * cos(in(JntType::HIP) + in(JntType::KNEE));
-  out.z() = - L0 * cos(in(JntType::YAW)) - L1 * cos(in(JntType::YAW)) * cos(in(JntType::HIP))
-      - L2 * cos(in(JntType::YAW)) * cos(in(JntType::HIP) + in(JntType::KNEE));
-}
-
-double __inscribed_circle_radius(const Eigen::Vector3d& A, const Eigen::Vector3d& B, const Eigen::Vector3d& C) {
+double __inscribed_circle_radius(
+    const Eigen::Vector2d& A, const Eigen::Vector2d& B, const Eigen::Vector2d& C) {
   float c = sqrt(pow((A.x()-B.x()),2) + pow((A.y()-B.y()),2));
   float b = sqrt(pow((A.x()-C.x()),2) + pow((A.y()-C.y()),2));
   float a = sqrt(pow((C.x()-B.x()),2) + pow((C.y()-B.y()),2));
@@ -834,9 +636,10 @@ double __inscribed_circle_radius(const Eigen::Vector3d& A, const Eigen::Vector3d
   return 2*s/(a+b+c);
 }
 
-Eigen::Vector3d __inner_heart(const Eigen::Vector3d& A, const Eigen::Vector3d& B, const Eigen::Vector3d& C) {
+Eigen::Vector2d __inner_heart(
+    const Eigen::Vector2d& A, const Eigen::Vector2d& B, const Eigen::Vector2d& C) {
   double a = 0, b = 0, c = 0;
-  Eigen::Vector3d heart(0.0, 0.0, 0.0);
+  Eigen::Vector2d heart(0.0, 0.0);
 
   a = sqrt(pow(B.x() - C.x(), 2) + pow(B.y() - C.y(), 2));
   b = sqrt(pow(A.x() - C.x(), 2) + pow(A.y() - C.y(), 2));
@@ -847,8 +650,9 @@ Eigen::Vector3d __inner_heart(const Eigen::Vector3d& A, const Eigen::Vector3d& B
   return heart;
 }
 
-Eigen::Vector3d __line_section(const Eigen::Vector3d& A, const Eigen::Vector3d& B, double ratio) {
-  Eigen::Vector3d result;
+Eigen::Vector2d __line_section(
+    const Eigen::Vector2d& A, const Eigen::Vector2d& B, double ratio) {
+  Eigen::Vector2d result;
   result.x() = B.x() - ratio * (B.x() - A.x());
   result.y() = B.y() - ratio * (B.y() - A.y());
   return result;

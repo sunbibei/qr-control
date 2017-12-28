@@ -34,13 +34,15 @@ public:
   ///! get the current leg state.
   virtual LegState leg_state() override;
 
-protected:
+public:
   /*!
    * @brief The forward kinematic solution for the foot link.
    * @param translation [out]  The current translation from the base frame.
    * @param quaternion  [out]  The current quaternion related to the base frame.
    */
   virtual void forwardKinematics(Eigen::Vector3d&, Eigen::Quaterniond&) override;
+  virtual void forwardKinematics(Eigen::Quaterniond&) override;
+  virtual void forwardKinematics(Eigen::Vector3d&)    override;
   /*!
    * @brief The inverse kinematic solution, given the target of foot pose.
    * @param translation [in]  The target of the translation from the base frame.
@@ -53,8 +55,18 @@ protected:
   virtual void inverseKinematics(const Eigen::Vector3d&,   EVX& angle)  override;
   virtual void inverseKinematics(const Eigen::Quaterniond&, EVX& angle) override;
 
+///! Offer some convenient interfaces for user.
+public:
+  ///! The position of LegType::YAW joint.
+  double yaw()  const { return joint_position_const_ref()(JntType::YAW);  }
+  ///! The position of LegType::HIP joint.
+  double hip()  const { return joint_position_const_ref()(JntType::HIP);  }
+  ///! The position of LegType::KNEE joint.
+  double knee() const { return joint_position_const_ref()(JntType::KNEE); }
+
 protected:
-  double     td_thres_;
+  double               td_thres_;
+  class QrLegTopology* topology_;
 
 public:
 /*model property*/
@@ -68,10 +80,6 @@ public:
   EV3 jointVelToFoot(const EV3& joint_pos, const EV3& joint_vel);
   EV3 footVelToJoint(const EV3& joint_pos, const EV3& foot_vel);
   bool getJacobMatrix(const EV3& a, EM3& JacobMatrix, EM3& inverseJacobMatrix);
-
-
-private:
-  class __PrivateParam* params_;
 
 };
 

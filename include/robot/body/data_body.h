@@ -47,9 +47,13 @@ public:
   const Eigen::MatrixXd& linear_acceleration_covariance_const_ref()     const;
   const Eigen::MatrixXd* linear_acceleration_covariance_const_pointer() const;
 
+  double body_length() const;
+  double body_height() const;
+  double body_width()  const;
 public:
   class _ImuSensor* imu_sensor_;
 
+  class _BodyTopology* body_size_;
 //  const double* imu_ang_vel_;
 //  const double* imu_ang_vel_cov_;
 //  const double* imu_lin_acc_;

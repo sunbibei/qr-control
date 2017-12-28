@@ -9,9 +9,7 @@
 #define INCLUDE_GAIT_WALK_WALK_H_
 
 #include "gait/gait_base.h"
-
-#include "ultility.h"
-#include "math.h"
+#include <Eigen/Dense>
 
 ///! Forward declaration
 class TimeControl;
@@ -49,15 +47,24 @@ protected:
   class QrBody*         body_iface_;
   ///! The interface for legs
   class QrLeg*          leg_ifaces_[LegType::N_LEGS];
-  ///! The commands of legs.
+  ///! The commands of legs. TODO Unused
   class LegTarget*      leg_cmds_[LegType::N_LEGS];
   ///! Whether is hang?
   bool            is_hang_walk_;
   ///! The Control tick interval(in ms)
   int64_t         tick_interval_;
-  ///! The temporay tick interval(in ms)
+  ///! The temporary tick interval(in ms)
   int64_t         sum_interval_;
-
+  ///! The position of each foot
+  Eigen::Vector3d foots_pos_[LegType::N_LEGS];
+  ///! The position of joints each leg
+  Eigen::VectorXd jnts_pos_ [LegType::N_LEGS];
+  ///! The last position of swing leg
+  Eigen::Vector3d last_foot_pos_;
+  ///! The target position of swing leg
+  Eigen::Vector3d next_foot_pos_;
+  ///! Variables about gait control
+  class WalkCoeff* coeff_;
 
 ///! These variable is temporary.
 private:
@@ -67,6 +74,9 @@ private:
   unsigned int          internal_order_;
   ///! The current swing leg
   LegType               swing_leg_;
+  ///! The cog adjust vector
+  Eigen::Vector2d       delta_cog_;
+  Eigen::Vector2d       swing_delta_cog_;
 
 ///! These methods are the callback method for WalkState.
 private:
@@ -79,29 +89,26 @@ private:
   ///! The debug callback for WK_HANG
   void hang_walk();
 
+  void reverse_kinematics();
+  void forward_kinematics();
+
 private:
   ///! Choice the next swing leg @next by @curr LegType.
-  LegType choice_next_leg(const LegType curr);
+  LegType next_leg(const LegType curr);
   void    next_foot_pt();
   void    move_cog();
   void    swing_leg(const LegType&);
   void    on_ground(const LegType&);
-  void    cog_swing(const _Position&, const LegType&);
-  _Position    get_CoG_adj_vec(const _Position&, LegType);
 
+  Eigen::Vector2d delta_cog(LegType);
+  Eigen::Vector2d inner_triangle(const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
+  Eigen::Vector2d stance_velocity(const Eigen::Vector2d&, unsigned int);
+  void cog_pos_assign(const Eigen::Vector2d& Adj);
 /////////////////////////////////////////////////////////////
 ///////////////////////// OLD CODE //////////////////////////
 /////////////////////////////////////////////////////////////
 private:
-  void forward_kinematics();
-  void reverse_kinematics();
 
-  void cog_pos_assign(_Position Adj);
-
-  void command_assign(const Angle&);
-
-  _Position innerTriangle(const _Position &A, const _Position &B, const _Position &C);
-  _Position get_stance_velocity(_Position Adj_vec, unsigned int Loop);
 
 protected:
   // Math* math;
@@ -110,20 +117,6 @@ protected:
   // boost::scoped_ptr<realtime_tools::RealtimePublisher<std_msgs::Float64MultiArray>> joint_state_publisher_;
 private:
   int Loop_Count;
-
-  Position shoulder_ = {{Body_L, Body_W, 0},
-      {Body_L, -Body_W, 0},
-      {-Body_L, Body_W, 0},
-      {-Body_L, -Body_W, 0}};
-  Angle jnts_pos_ = {{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
-  Position foots_pos_ = { {0, 0, -L0 - L1 - L2},
-                          {0, 0, -L0 - L1 - L2},
-                          {0, 0, -L0 - L1 - L2},
-                          {0, 0, -L0 - L1 - L2}};
-
-  _Position Desired_Foot_Pos = {0,0,0};
-  _Position Pos_start,Cog_adj;
-  _Position swing_adj_CoG;
 };
 
 } /* namespace qr_control */
