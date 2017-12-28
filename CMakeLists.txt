@@ -32,6 +32,7 @@ set(SRC_GAITS_ROOT    ${SRC_ROOT}/gait)
 
 set(SRC_ROBOT_ROOT    ${SRC_ROOT}/robot)
 set(SRC_RO_LEG_ROOT   ${SRC_ROBOT_ROOT}/leg)
+set(SRC_RO_BOFY_ROOT  ${SRC_ROBOT_ROOT}/body)
 
 set(SRC_ADT_ROOT      ${SRC_ROOT}/adt)
 
@@ -42,8 +43,6 @@ set(GAIT_FILES        ${SRC_GAITS_ROOT}/gait_manager.cpp
                       ${SRC_GAITS_ROOT}/agent/rl_agent.cpp
 
                       ${SRC_GAITS_ROOT}/walk/walk.cpp
-                      ${SRC_GAITS_ROOT}/walk/foot_contact.cpp
-                      ${SRC_GAITS_ROOT}/walk/gesture_control.cpp
                       ${SRC_GAITS_ROOT}/walk/math.cpp
                       ${SRC_GAITS_ROOT}/walk/swing.cpp
 )
@@ -52,7 +51,10 @@ set(ROBOT_FILES       ${SRC_RO_LEG_ROOT}/data_leg.cpp
                       ${SRC_RO_LEG_ROOT}/math_leg.cpp
                       ${SRC_RO_LEG_ROOT}/robot_leg.cpp
                       ${SRC_RO_LEG_ROOT}/qr_leg.cpp
-                      ${SRC_ROBOT_ROOT}/robot_body.cpp
+                      ${SRC_RO_BOFY_ROOT}/data_body.cpp
+                      ${SRC_RO_BOFY_ROOT}/math_body.cpp
+                      ${SRC_RO_BOFY_ROOT}/qr_body.cpp
+                      ${SRC_RO_BOFY_ROOT}/robot_body.cpp
 )
 
 set(CTRL_FILES        ${SRC_ROOT}/mii_control.cpp

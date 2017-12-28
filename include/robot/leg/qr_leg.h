@@ -10,6 +10,7 @@
 #define INCLUDE_ROBOT_LEG_QR_LEG_H_
 
 #include "robot/leg/robot_leg.h"
+#include <foundation/utf.h>
 
 namespace qr_control {
 

@@ -5,18 +5,45 @@
  *      Author: bibei
  */
 
-#include "robot/robot_body.h"
+#include <robot/body/robot_body.h>
 
 namespace qr_control {
 
-// RobotBody::RobotBody()
-//   : Label("robot-body") {
-//   ;
-// }
+#define G (9.8)
 
-// RobotBody::~RobotBody() {
-//   ;
-// }
+RobotBody::RobotBody() {
+ ;
+}
+
+//bool RobotBody::init() {
+//
+//  return true;
+//}
+
+ RobotBody::~RobotBody() {
+   ;
+ }
+
+///! The translation of robot against the world frame
+void RobotBody::translation(EV3&) /*= 0*/ {
+  LOG_ERROR << "Call the 'translation' which has does not complemented.";
+}
+
+///! The rotation of robot against the world frame
+void RobotBody::rotation(Eigen::Quaterniond&) /*= 0*/ {
+  LOG_ERROR << "Call the 'rotation' which has does not complemented.";
+}
+
+///! The velocity of robot against the world frame
+void RobotBody::velocity(EV3& v)  /*= 0*/ {
+  LOG_ERROR << "Call the 'velocity' which has does not complemented.";
+}
+
+///! The centre of gravity of robot
+void RobotBody::cog(EV3&)         /*= 0*/ {
+  LOG_ERROR << "Call the 'cog' which has does not complemented.";
+}
+
 
 
 void RobotBody::setExecuteDuration(const double& duration)

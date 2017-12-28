@@ -5,30 +5,31 @@
  *      Author: bibei
  */
 
-#ifndef INCLUDE_ROBOT_ROBOT_BODY_H_
-#define INCLUDE_ROBOT_ROBOT_BODY_H_
+#ifndef INCLUDE_ROBOT_BODY_ROBOT_BODY_H_
+#define INCLUDE_ROBOT_BODY_ROBOT_BODY_H_
 
-#include <foundation/label.h>
-#include <foundation/utf.h>
-#include <Eigen/Dense>
-
-#define G 9.80665
+#include "math_body.h"
 
 namespace qr_control {
 
-class RobotBody: public Label {
+class RobotBody: public MathBody {
 public:
-  RobotBody() : Label("robot-body") { };
-  virtual ~RobotBody() { };
+  RobotBody();
+  // virtual bool init() override;
+  virtual ~RobotBody();
+
+///! inherit from MathBody
+public:
+  ///! The translation of robot against the world frame
+  void translation(EV3&) /*= 0*/;
+  ///! The rotation of robot against the world frame
+  void rotation(Eigen::Quaterniond&) /*= 0*/;
+  ///! The velocity of robot against the world frame
+  void velocity(EV3& v)  /*= 0*/;
+  ///! The centre of gravity of robot
+  void cog(EV3&)         /*= 0*/;
 
 public:
-  
-  void cogCal(EV3& translation);
- 
-  void rotation(Eigen::Quaterniond& quaternion);
-  
-  void velocity(EV3& v);
-
   void calZmpPos();
   void setExecuteDuration(const double& duration);
   void setCogThreshold(const double& threshold);
@@ -37,7 +38,6 @@ public:
   EV3 calCogVel(const EV3& dist, const int& t);
 
 private:
-
   EV3 calInnerHeart(const EV3& A, const EV3& B, const EV3& C);
 
   EV3 calLineSection(const EV3& A, const EV3& B, float ratio);  
@@ -55,4 +55,4 @@ private:
 
 } /* namespace qr_control */
 
-#endif /* INCLUDE_ROBOT_ROBOT_BODY_H_ */
+#endif /* INCLUDE_ROBOT_BODY_ROBOT_BODY_H_ */
