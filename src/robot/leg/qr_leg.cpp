@@ -90,6 +90,10 @@ void QrLeg::setForceThreshold(double threshold) {
 }
 
 LegState QrLeg::leg_state()  {
+  // TODO
+  // Eigen::Vector3d _xyz;
+  // forwardKinematics(_xyz);
+  // return ((-46 == _xyz.z()) ? LegState::TD_STATE : LegState::AIR_STATE);
   return (foot_force() > td_thres_) ? LegState::TD_STATE : LegState::AIR_STATE;
 }
 
@@ -211,8 +215,11 @@ void QrLeg::forwardKinematics(Eigen::Vector3d& xyz, Eigen::Quaterniond&) {
 }
 
 void QrLeg::forwardKinematics(Eigen::Vector3d& xyz) {
-  xyz.x() = topology_->L1() * sin(hip())
-      + topology_->L2() * sin(hip() + knee());
+  // TODO WSR is as follow
+  // xyz.x() = -topology_->L1() * sin(hip())
+  //     - topology_->L2() * sin(hip() + knee());
+  xyz.x() = -topology_->L1() * sin(hip())
+      - topology_->L2() * sin(hip() + knee());
 
   xyz.y() = topology_->L0() * sin(yaw()) + topology_->L1() * sin(yaw()) * cos(hip())
       + topology_->L2() * sin(yaw()) * cos(hip() + knee());

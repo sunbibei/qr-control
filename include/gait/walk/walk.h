@@ -9,10 +9,11 @@
 #define INCLUDE_GAIT_WALK_WALK_H_
 
 #include "gait/gait_base.h"
+#include "adt/trajectory.h"
+
 #include <Eigen/Dense>
 
-#define PUB_ROS_TOPIC
-
+// #define PUB_ROS_TOPIC
 #ifdef PUB_ROS_TOPIC
 #include <ros/ros.h>
 #include <boost/scoped_ptr.hpp>
@@ -30,6 +31,7 @@ enum WalkState {
   UNKNOWN_WK_STATE = -1,
   WK_WAITING = 0,
   WK_INIT_POSE,
+  WK_MOVE_COG,
   WK_SWING,
   WK_HANG,
   N_WK_STATE,
@@ -46,8 +48,10 @@ public:
 public:
   virtual void              checkState()    override;
   virtual StateMachineBase* state_machine() override;
-  virtual void              prev_tick() override;
+  // virtual void              prev_tick() override;
   virtual void              post_tick() override;
+  virtual bool              starting()  override;
+  // virtual void              stopping()  override;
 
 protected:
   WalkState                  current_state_;
@@ -75,18 +79,23 @@ protected:
   Eigen::Vector3d next_foot_pos_;
   ///! Variables about gait control
   class WalkCoeff* coeff_;
+  ///! The time control
+  TimeControl*     timer_;
+  ///! The current swing leg
+  LegType          swing_leg_;
+  ///! The trajectory for end-effector
+  Trajectory3d*    eef_traj_;
+  ///! The trajectory for joints
+  Trajectory3d*    jnt_traj_;
 
 ///! These variable is temporary.
 private:
-  TimeControl*          timer_;
   bool                  is_send_init_cmds_;
-  ///! The internal flag
-  unsigned int          internal_order_;
-  ///! The current swing leg
-  LegType               swing_leg_;
   ///! The cog adjust vector
   Eigen::Vector2d       delta_cog_;
   Eigen::Vector2d       swing_delta_cog_;
+  ///! The temporary position variable using in the swing_leg
+  Eigen::Vector3d       tmp_eef_pos_;
 
 ///! These methods are the callback method for WalkState.
 private:
@@ -94,6 +103,10 @@ private:
   void waiting();
   ///! The callback for WK_INIT_POSE
   void pose_init();
+  ///! The callback for WK_MOVE_COG
+  void move_cog();
+  ///! The callback for WK_SWING
+  void swing_leg();
   ///! The callback for WK_XXX
   void walk();
   ///! The debug callback for WK_HANG
@@ -108,18 +121,31 @@ private:
     std_msgs::Float64MultiArray>> cmd_pub_;
 #endif
 
+///! The helper for move COG.
 private:
-  ///! Choice the next swing leg @next by @curr LegType.
-  LegType next_leg(const LegType curr);
-  void    next_foot_pt();
-  void    move_cog();
-  void    swing_leg(const LegType&);
-  void    on_ground(const LegType&);
-
   Eigen::Vector2d delta_cog(LegType);
-  Eigen::Vector2d inner_triangle(const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
   Eigen::Vector2d stance_velocity(const Eigen::Vector2d&, int);
-  void cog_pos_assign(const Eigen::Vector2d& Adj);
+
+///! The helper for swing leg.
+private:
+  void eef_trajectory();
+
+private:
+  /*!
+   * @brief Choice the next swing leg @next by @curr LegType.
+   *        The flow of swing leg is designed by this method.
+   *        The order as follow:
+   *        HL -> FL -> HR -> FR
+   */
+  LegType next_leg(const LegType);
+  /*!
+   * @brief Update the next foot point for the swing leg.
+   *        The default next foot point is {STEP, XX, -BH},
+   *        namely the swing leg move forward STEP cm.
+   */
+  void    next_foot_pt();
+
+  Eigen::Vector2d inner_triangle(const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
 /////////////////////////////////////////////////////////////
 ///////////////////////// OLD CODE //////////////////////////
 /////////////////////////////////////////////////////////////
