@@ -30,7 +30,7 @@ GaitManager::~GaitManager() {
 
 bool GaitManager::init() {
   for (const auto& g : res_list_) {
-    gait_list_by_name_.insert(std::make_pair(g->gaitName(), g));
+    gait_list_by_name_.insert(std::make_pair(g->name(), g));
   }
 
   return true;
@@ -38,17 +38,29 @@ bool GaitManager::init() {
 
 void GaitManager::tick() {
   if ((!running_gait_) && (!active_gait_)) {
+    ///! No gait be running, and no active gait.
     return;
   } else if ((!running_gait_) && (active_gait_)) {
-    running_gait_ = active_gait_;
-  } else if (running_gait_ != active_gait_) {
-    if (running_gait_->canSwitch())
+    ///! No gait be running, and an active gait.
+    if (active_gait_->starting()) {
       running_gait_ = active_gait_;
-    else
+    } else {
+      LOG_ERROR << "The named " << active_gait_->name()
+          << " gait is starting fail.";
+      active_gait_->stopping();
+      active_gait_ = nullptr;
+      return;
+    }
+  } else if (running_gait_ != active_gait_) {
+    ///! The running gait is not the active gait.
+    if (running_gait_->canSwitch()) {
+      running_gait_->stopping();
+      running_gait_ = nullptr;
+    } else
       LOG_EVERY_N(WARNING, 10) << "Waiting to switch from "
-        << running_gait_->gaitName() << " to " << active_gait_->gaitName();
+        << running_gait_->name() << " to " << active_gait_->name();
   } else { // runing_gait_ == active_gait_
-    ;
+    ; // Unreachable code
   }
 
   ///! prev tick

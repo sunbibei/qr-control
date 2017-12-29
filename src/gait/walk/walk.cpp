@@ -527,7 +527,7 @@ void Walk::cog_pos_assign(const Eigen::Vector2d& _adj) {
 
 
 ///////////////////////////////////////////////////////////////////////////////
-////////////        The implementation of inline methods         ////////////
+////////////        The implementation of inline methods         //////////////
 ///////////////////////////////////////////////////////////////////////////////
 void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
     const Eigen::VectorXd& hl, const Eigen::VectorXd& hr) {

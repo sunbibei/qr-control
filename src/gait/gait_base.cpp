@@ -45,6 +45,23 @@ bool GaitBase::canSwitch() {
   return true;
 }
 
+/*!
+ * @brief This method will be called when the gait is activated and
+ *        ready to run. If return false, it don't be running, instead
+ *        of nothing to run, until the user activate the next gait.
+ */
+bool GaitBase::starting() /*= 0*/ {
+  return true;
+}
+
+/*!
+ * @brief This method will be called when the gait is stopping and switch
+ *        to the other gait.
+ */
+void GaitBase::stopping() /*= 0*/ {
+  ; // Nothing to do under the default action.
+}
+
 //void GaitBase::checkState() {
 //  LOG_ERROR << "Call the base method 'checkState'";
 //}

@@ -47,10 +47,15 @@ protected:
   MiiMap<_State, CallBack> cb_map_;
 };
 
+
+///////////////////////////////////////////////////////////////////////////////
+////////////              The define of GaitBase class           //////////////
+///////////////////////////////////////////////////////////////////////////////
 class GaitBase: public Label {
   friend class GaitManager;
 public:
   GaitBase(const MiiString& _l = "gait-base");
+  ///! For auto-instance
   virtual bool init() override;
 
   virtual ~GaitBase();
@@ -59,7 +64,7 @@ public:
   /*!
    * @brief The name of gait.
    */
-  const MiiString& gaitName() const { return gait_name_;  }
+  const MiiString& name() const { return gait_name_;  }
 
   /**
    * @brief The interface that get the current state. This method
@@ -86,6 +91,20 @@ protected:
    *        this class is needs to auto-instance, so cancel '=0'.
    */
   virtual StateMachineBase* state_machine() = 0;
+
+  /*!
+   * @brief This method will be called when the gait is activated and
+   *        ready to run. If return false, it don't be running, instead
+   *        of nothing to run, until the user activate the next gait.
+   */
+  virtual bool starting() /*= 0*/;
+
+  /*!
+   * @brief This method will be called when the gait is stopping and switch
+   *        to the other gait.
+   */
+  virtual void stopping() /*= 0*/;
+
   /*!
    * @brief The current state whether could switch to ohter gait object.
    */
