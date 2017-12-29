@@ -195,7 +195,7 @@ void Walk::checkState() {
   {
     if (!is_send_init_cmds_) return;
     for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-      auto diff = (leg_cmds_[l]->target - leg_ifaces_[l]->joint_position_const_ref()).norm();
+      auto diff = (jnts_pos_[l] - leg_ifaces_[l]->joint_position_const_ref()).norm();
       if (diff > 0.1) return;
     }
     LOG_WARNING << "INIT POSE OK!";
