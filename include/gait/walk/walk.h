@@ -94,6 +94,8 @@ private:
   ///! The cog adjust vector
   Eigen::Vector2d       delta_cog_;
   Eigen::Vector2d       swing_delta_cog_;
+  ///! The temporary position variable using in the swing_leg
+  Eigen::Vector3d       tmp_eef_pos_;
 
 ///! These methods are the callback method for WalkState.
 private:

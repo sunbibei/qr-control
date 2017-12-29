@@ -187,4 +187,18 @@ void RobotLeg:: eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy) {
   forwardKinematics(_xyz, _rpy);
 }
 
+void RobotLeg::eef(Eigen::Vector3d& _xyz) {
+  forwardKinematics(_xyz);
+}
+
+void RobotLeg::eef(Eigen::Quaterniond& _rpy) {
+  forwardKinematics(_rpy);
+}
+
+Eigen::Vector3d RobotLeg::eef() {
+  Eigen::Vector3d _xyz;
+  forwardKinematics(_xyz);
+  return _xyz;
+}
+
 } /* namespace qr_control */

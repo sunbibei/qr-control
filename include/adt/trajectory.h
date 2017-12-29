@@ -11,6 +11,7 @@
 #include "internal/comma_init.h"
 
 #include <Eigen/Dense>
+#include <iomanip>
 #include <float.h>
 
 namespace qr_control {
@@ -248,42 +249,45 @@ Trajectory<_DataType, _Dim_X>::~Trajectory() {
 
 template<typename _T1, int _T2>
 std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, _T2>& traj) {
-  // std::stringstream ss;
+  os.setf(std::ios::showpos | std::ios::fixed/* | std::ios::internal*/);
   for (int i = 0; i < _T2; ++i) {
-    os << "x" << i << " = ";
+    os << "x" << std::to_string(i) << " = ";
     const auto& _coeff = traj.coeffs_.row(i);
-    const int T = _coeff.cols() - 1;
-    for (int j = 0; j < T; ++j) {
-      os << _coeff(j) << "t^" << j << " + ";
+    for (int j = 0; j < _coeff.cols(); ++j) {
+      os << std::setw(10) << std::setprecision(2) << _coeff(j);
+      os << " t^" << std::to_string(j);
     }
-    os << _coeff(T) << "t^" << T << "\n";
+    os << "\n";
   }
-  // os << "The coefficients of the trajectory is :\n" << traj.coeffs_ << std::endl;
   return os;
 }
 
 template<typename _T1>
 std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 1>& traj) {
+  os.setf(std::ios::showpos | std::ios::fixed/* | std::ios::internal*/);
+
   os << "x = ";
-  const int T = traj.coeffs_.cols() - 1;
-  for (int j = 0; j < T; ++j) {
-    os << traj.coeffs_(j) << "t^" << j << " + ";
+  const auto& _coeff = traj.coeffs_.row(0);
+  for (int j = 0; j < _coeff.cols(); ++j) {
+    os << std::setw(10) << std::setprecision(2) << _coeff(j);
+    os << " t^" << std::to_string(j);
   }
-  os << traj.coeffs_(T) << "t^" << T << "\n";
-  // os << "The coefficients of the trajectory is :\n" << traj.coeffs_ << std::endl;
+  os << "\n";
+
   return os;
 }
 
 template<typename _T1>
 std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 2>& traj) {
+  os.setf(std::ios::showpos | std::ios::fixed/* | std::ios::internal*/);
   for (int i = 0; i < 2; ++i) {
-    os << (const char* []) {"x = ", "y = ", "z = "}[i];
+    os << (const char* []) {"x = ", "y = "}[i];
     const auto& _coeff = traj.coeffs_.row(i);
-    const int T = _coeff.cols() - 1;
-    for (int j = 0; j < T; ++j) {
-      os << _coeff(j) << "t^" << j << " + ";
+    for (int j = 0; j < _coeff.cols(); ++j) {
+      os << std::setw(10) << std::setprecision(2) << _coeff(j);
+      os << " t^" << std::to_string(j);
     }
-    os << _coeff(T) << "t^" << T << "\n";
+    os << "\n";
   }
   // os << "The coefficients of the trajectory is :\n" << traj.coeffs_ << std::endl;
   return os;
@@ -291,14 +295,15 @@ std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 2>& traj) {
 
 template<typename _T1>
 std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 3>& traj) {
+  os.setf(std::ios::showpos | std::ios::fixed/* | std::ios::internal*/);
   for (int i = 0; i < 3; ++i) {
     os << (const char* []) {"x = ", "y = ", "z = "}[i];
     const auto& _coeff = traj.coeffs_.row(i);
-    const int T = _coeff.cols() - 1;
-    for (int j = 0; j < T; ++j) {
-      os << _coeff(j) << "t^" << j << " + ";
+    for (int j = 0; j < _coeff.cols(); ++j) {
+      os << std::setw(10) << std::setprecision(2) << _coeff(j);
+      os << " t^" << std::to_string(j);
     }
-    os << _coeff(T) << "t^" << T << "\n";
+    os << "\n";
   }
   // os << "The coefficients of the trajectory is :\n" << traj.coeffs_ << std::endl;
   return os;

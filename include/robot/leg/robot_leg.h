@@ -37,6 +37,9 @@ public:
 ///! The status of robot-leg of getter
 public:
   void eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy);
+  void eef(Eigen::Vector3d&);
+  void eef(Eigen::Quaterniond&);
+  Eigen::Vector3d eef();
  
 public:
   /*!
