@@ -69,8 +69,6 @@ protected:
   int64_t         tick_interval_;
   ///! The temporary tick interval(in ms)
   int64_t         sum_interval_;
-  ///! The position of each foot
-  Eigen::Vector3d foots_pos_[LegType::N_LEGS];
   ///! The position of joints each leg
   Eigen::VectorXd jnts_pos_cmd_ [LegType::N_LEGS];
   ///! The last position of swing leg
@@ -111,9 +109,6 @@ private:
   void walk();
   ///! The debug callback for WK_HANG
   void hang_walk();
-
-  void reverse_kinematics();
-  void forward_kinematics();
 
 #ifdef PUB_ROS_TOPIC
   boost::scoped_ptr<ros::NodeHandle> nh_;
