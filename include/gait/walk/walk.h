@@ -9,10 +9,11 @@
 #define INCLUDE_GAIT_WALK_WALK_H_
 
 #include "gait/gait_base.h"
+#include "adt/trajectory.h"
+
 #include <Eigen/Dense>
 
-#define PUB_ROS_TOPIC
-
+// #define PUB_ROS_TOPIC
 #ifdef PUB_ROS_TOPIC
 #include <ros/ros.h>
 #include <boost/scoped_ptr.hpp>
@@ -81,7 +82,11 @@ protected:
   ///! The time control
   TimeControl*     timer_;
   ///! The current swing leg
-  LegType               swing_leg_;
+  LegType          swing_leg_;
+  ///! The trajectory for end-effector
+  Trajectory3d*    eef_traj_;
+  ///! The trajectory for joints
+  Trajectory3d*    jnt_traj_;
 
 ///! These variable is temporary.
 private:
@@ -114,10 +119,14 @@ private:
     std_msgs::Float64MultiArray>> cmd_pub_;
 #endif
 
-///! The helper for move cog.
+///! The helper for move COG.
 private:
   Eigen::Vector2d delta_cog(LegType);
   Eigen::Vector2d stance_velocity(const Eigen::Vector2d&, int);
+
+///! The helper for swing leg.
+private:
+  void eef_trajectory();
 
 private:
   /*!

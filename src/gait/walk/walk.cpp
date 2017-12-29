@@ -92,6 +92,7 @@ Walk::Walk()
     is_hang_walk_(false), tick_interval_(50),
     sum_interval_(0), coeff_(nullptr),
     timer_(nullptr), swing_leg_(LegType::HL),
+    eef_traj_(nullptr), jnt_traj_(nullptr),
     /* These variables are the private. */
     is_send_init_cmds_(false)
 {
@@ -230,6 +231,9 @@ void Walk::checkState() {
     if(Loop_Count >= coeff_->STANCE_TIME) {
       Loop_Count = 0;
       next_foot_pt();
+      std::cout << "last_foot_pos: " <<  last_foot_pos_.transpose() << std::endl;
+      std::cout << "next_foot_pos: " <<  next_foot_pos_.transpose() << std::endl;
+      eef_trajectory();
       LOG_WARNING << "*******----END MVOE  COG----*******";
       PRESS_THEN_GO
       current_state_ = WalkState::WK_SWING;
@@ -270,6 +274,28 @@ void Walk::post_tick() {
   for (const auto& leg : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
     leg_ifaces_[leg]->legTarget(JntCmdType::CMD_POS, jnts_pos_cmd_[leg]);
     leg_ifaces_[leg]->move();
+  }
+
+  if (nullptr != eef_traj_) {
+    double dt = Loop_Count;
+    dt /= coeff_->SWING_TIME;
+    auto samp = eef_traj_->sample(dt);
+    std::cout << "sample:\n" << samp.transpose() << std::endl;
+    PRESS_THEN_GO
+
+    Eigen::Vector3d _xyz(samp.x(), samp.y(), samp.z());
+    Eigen::VectorXd _jnt;
+    const auto& _tjnt = jnts_pos_cmd_[swing_leg_];
+    leg_ifaces_[swing_leg_]->inverseKinematics(_xyz, _jnt);
+    auto diff = (_tjnt - _jnt).norm();
+    printf("___________________________________________\n");
+    printf("|LEG -|   YAW  |   HIP  |  KNEE  |  ERROR |\n");
+  //printf("|LEG -| +0.0000| +0.0000| +0.0000| +0.0000|LEG -| +0.0000| +0.0000| +0.0000| +0.0000|\n");
+    printf("| %02d -| %+01.04f| %+01.04f| %+01.04f|    -   |\n",
+        swing_leg_, _jnt(JntType::YAW), _jnt(JntType::HIP), _jnt(JntType::KNEE));
+    printf("| %02d =| %+01.04f| %+01.04f| %+01.04f| %+01.04f|\n",
+        swing_leg_, _tjnt(JntType::YAW), _tjnt(JntType::HIP), _tjnt(JntType::KNEE), diff);
+    printf("-------------------------------------------\n");
   }
 
   PRINT_COMMAND
@@ -431,6 +457,37 @@ void Walk::swing_leg() {
   }
   reverse_kinematics();
   ++Loop_Count;
+}
+
+void Walk::eef_trajectory() {
+  // TODO
+  const auto& _p0 = last_foot_pos_;
+  const auto& _p1 = next_foot_pos_;
+
+  Eigen::Matrix3d A;
+  A << 1,   0,    0,
+       1,   1,    1,
+       1, 0.5, 0.25;
+  // std::cout << "A:\n" << A << std::endl;
+  Eigen::Matrix3d b;
+  b.row(0) = _p0;
+  b.row(1) = _p1;
+  b.row(2) << (_p0.x()/2 + _p1.x()/2), _p0.y(), (_p0.z() + coeff_->SWING_HEIGHT);
+  // std::cout << "b:\n" << b << std::endl;
+  Eigen::Matrix3d c;
+  if (0 == A.determinant()) {
+    c = A.householderQr().solve(b);
+    std::cout << "NO cross point, Using this result: " << c.transpose() << std::endl;
+  } else {
+    c = A.partialPivLu().solve(b);
+  }
+
+  delete eef_traj_;
+  // Trajectory3d::CoeffMat traj_c;
+  // traj_c
+  eef_traj_ = new Trajectory3d(c.transpose());
+  std::cout << "Trajectory:\n" << *eef_traj_ << std::endl;
+  PRESS_THEN_GO
 }
 
 Eigen::Vector2d Walk::delta_cog(LegType leg) {
@@ -679,9 +736,10 @@ void __cross_point(
   beta(1) = cof_mat.row(1) * p1_0;
   Eigen::Vector2d x(0., 0.);
   if (0 == cof_mat.determinant()) {
-    std::cout << "NO cross point";
+    res = cof_mat.householderQr().solve(beta);
+    std::cout << "NO cross point, Using the result: " << res.transpose() << std::endl;
   } else {
-    res = cof_mat.colPivHouseholderQr().solve(beta);
+    res = cof_mat.partialPivLu().solve(beta);
   }
 }
 

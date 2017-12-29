@@ -95,8 +95,15 @@ protected:
   Eigen::Index dim_exp_;
 
 public:
+  template<typename _T1>
+  friend std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 1>& traj);
+  template<typename _T1>
+  friend std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 2>& traj);
+  template<typename _T1>
+  friend std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 3>& traj);
   template<typename _T1, int _T2>
   friend std::ostream& operator<<(std::ostream&, const Trajectory<_T1, _T2>& traj);
+
   ///! Just for fun
   internal::CommaInitializer<Trajectory<_DataType, _Dim_X>, _DataType>
     operator<<(const _DataType& in);
@@ -241,7 +248,59 @@ Trajectory<_DataType, _Dim_X>::~Trajectory() {
 
 template<typename _T1, int _T2>
 std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, _T2>& traj) {
-  os << "The coefficients of the trajectory is :\n" << traj.coeffs_ << std::endl;
+  // std::stringstream ss;
+  for (int i = 0; i < _T2; ++i) {
+    os << "x" << i << " = ";
+    const auto& _coeff = traj.coeffs_.row(i);
+    const int T = _coeff.cols() - 1;
+    for (int j = 0; j < T; ++j) {
+      os << _coeff(j) << "t^" << j << " + ";
+    }
+    os << _coeff(T) << "t^" << T << "\n";
+  }
+  // os << "The coefficients of the trajectory is :\n" << traj.coeffs_ << std::endl;
+  return os;
+}
+
+template<typename _T1>
+std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 1>& traj) {
+  os << "x = ";
+  const int T = traj.coeffs_.cols() - 1;
+  for (int j = 0; j < T; ++j) {
+    os << traj.coeffs_(j) << "t^" << j << " + ";
+  }
+  os << traj.coeffs_(T) << "t^" << T << "\n";
+  // os << "The coefficients of the trajectory is :\n" << traj.coeffs_ << std::endl;
+  return os;
+}
+
+template<typename _T1>
+std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 2>& traj) {
+  for (int i = 0; i < 2; ++i) {
+    os << (const char* []) {"x = ", "y = ", "z = "}[i];
+    const auto& _coeff = traj.coeffs_.row(i);
+    const int T = _coeff.cols() - 1;
+    for (int j = 0; j < T; ++j) {
+      os << _coeff(j) << "t^" << j << " + ";
+    }
+    os << _coeff(T) << "t^" << T << "\n";
+  }
+  // os << "The coefficients of the trajectory is :\n" << traj.coeffs_ << std::endl;
+  return os;
+}
+
+template<typename _T1>
+std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 3>& traj) {
+  for (int i = 0; i < 3; ++i) {
+    os << (const char* []) {"x = ", "y = ", "z = "}[i];
+    const auto& _coeff = traj.coeffs_.row(i);
+    const int T = _coeff.cols() - 1;
+    for (int j = 0; j < T; ++j) {
+      os << _coeff(j) << "t^" << j << " + ";
+    }
+    os << _coeff(T) << "t^" << T << "\n";
+  }
+  // os << "The coefficients of the trajectory is :\n" << traj.coeffs_ << std::endl;
   return os;
 }
 
