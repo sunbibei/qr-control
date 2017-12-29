@@ -11,6 +11,16 @@
 #include "gait/gait_base.h"
 #include <Eigen/Dense>
 
+#define PUB_ROS_TOPIC
+
+#ifdef PUB_ROS_TOPIC
+#include <ros/ros.h>
+#include <boost/scoped_ptr.hpp>
+#include <std_msgs/Float64MultiArray.h>
+#include <realtime_tools/realtime_buffer.h>
+#include <realtime_tools/realtime_publisher.h>
+#endif
+
 ///! Forward declaration
 class TimeControl;
 
@@ -58,7 +68,7 @@ protected:
   ///! The position of each foot
   Eigen::Vector3d foots_pos_[LegType::N_LEGS];
   ///! The position of joints each leg
-  Eigen::VectorXd jnts_pos_ [LegType::N_LEGS];
+  Eigen::VectorXd jnts_pos_cmd_ [LegType::N_LEGS];
   ///! The last position of swing leg
   Eigen::Vector3d last_foot_pos_;
   ///! The target position of swing leg
@@ -92,6 +102,12 @@ private:
   void reverse_kinematics();
   void forward_kinematics();
 
+#ifdef PUB_ROS_TOPIC
+  boost::scoped_ptr<ros::NodeHandle> nh_;
+  boost::scoped_ptr<realtime_tools::RealtimePublisher<
+    std_msgs::Float64MultiArray>> cmd_pub_;
+#endif
+
 private:
   ///! Choice the next swing leg @next by @curr LegType.
   LegType next_leg(const LegType curr);
@@ -102,19 +118,11 @@ private:
 
   Eigen::Vector2d delta_cog(LegType);
   Eigen::Vector2d inner_triangle(const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
-  Eigen::Vector2d stance_velocity(const Eigen::Vector2d&, unsigned int);
+  Eigen::Vector2d stance_velocity(const Eigen::Vector2d&, int);
   void cog_pos_assign(const Eigen::Vector2d& Adj);
 /////////////////////////////////////////////////////////////
 ///////////////////////// OLD CODE //////////////////////////
 /////////////////////////////////////////////////////////////
-private:
-
-
-protected:
-  // Math* math;
-
-  // std_msgs::Float64MultiArray msg;
-  // boost::scoped_ptr<realtime_tools::RealtimePublisher<std_msgs::Float64MultiArray>> joint_state_publisher_;
 private:
   int Loop_Count;
 };
