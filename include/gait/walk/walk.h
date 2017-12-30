@@ -69,8 +69,6 @@ protected:
   int64_t         tick_interval_;
   ///! The temporary tick interval(in ms)
   int64_t         sum_interval_;
-  ///! The position of joints each leg
-  Eigen::VectorXd jnts_pos_cmd_ [LegType::N_LEGS];
   ///! The last position of swing leg
   Eigen::Vector3d last_foot_pos_;
   ///! The target position of swing leg
@@ -90,10 +88,12 @@ protected:
 private:
   bool                  is_send_init_cmds_;
   ///! The cog adjust vector
-  Eigen::Vector2d       delta_cog_;
+  Eigen::Vector2d       next_cog_proj_;
   Eigen::Vector2d       swing_delta_cog_;
   ///! The temporary position variable using in the swing_leg
   Eigen::Vector3d       tmp_eef_pos_;
+  ///! The temporary time span variable
+  int64_t               phase_time_span_;
 
 ///! These methods are the callback method for WalkState.
 private:
@@ -118,7 +118,7 @@ private:
 
 ///! The helper for move COG.
 private:
-  Eigen::Vector2d delta_cog(LegType);
+  Eigen::Vector2d prog_next_cog(LegType);
   Eigen::Vector2d stance_velocity(const Eigen::Vector2d&, int);
 
 ///! The helper for swing leg.
@@ -138,7 +138,7 @@ private:
    *        The default next foot point is {STEP, XX, -BH},
    *        namely the swing leg move forward STEP cm.
    */
-  void    next_foot_pt();
+  void    prog_next_fpt();
 
   Eigen::Vector2d inner_triangle(const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
 /////////////////////////////////////////////////////////////

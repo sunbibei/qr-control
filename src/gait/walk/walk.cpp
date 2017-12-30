@@ -24,14 +24,14 @@ namespace qr_control {
     leg_ifaces_[LegType::HR]->joint_position_const_ref()
 
 #define PRINT_PARAM_TARGET_POS \
-    jnts_pos_cmd_[LegType::FL], \
-    jnts_pos_cmd_[LegType::FR], \
-    jnts_pos_cmd_[LegType::HL], \
-    jnts_pos_cmd_[LegType::HR]
+    leg_cmds_[LegType::FL]->target, \
+    leg_cmds_[LegType::FR]->target, \
+    leg_cmds_[LegType::HL]->target, \
+    leg_cmds_[LegType::HR]->target
 
 #define PRINT_CURRENT_POSS   __print_positions(PRINT_PARAM_CURRENT_POS);
 #define PRINT_POSS_VS_TARGET __print_positions(PRINT_PARAM_CURRENT_POS, PRINT_PARAM_TARGET_POS);
-#define PRINT_COMMAND        __print_command(jnts_pos_cmd_);
+#define PRINT_COMMAND        __print_command(leg_cmds_);
 #define PRESS_THEN_GO        {LOG_WARNING << "Press any key to continue."; getchar();}
 
 ///! These are the inline functions forward declare.
@@ -49,7 +49,10 @@ void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
     const Eigen::VectorXd& tfl, const Eigen::VectorXd& tfr,
     const Eigen::VectorXd& thl, const Eigen::VectorXd& thr);
 
+void __print_command(LegTarget**);
+
 void __print_command(const Eigen::VectorXd*);
+
 void __cycloid_position(
       const Eigen::Vector3d&, const Eigen::Vector3d&, int, int, int, Eigen::Vector3d&);
 
@@ -103,7 +106,7 @@ Walk::Walk()
     timer_(nullptr), swing_leg_(LegType::HL),
     eef_traj_(nullptr), jnt_traj_(nullptr),
     /* These variables are the private. */
-    is_send_init_cmds_(false)
+    is_send_init_cmds_(false), phase_time_span_(0)
 {
   for (auto& iface : leg_ifaces_)
     iface = nullptr;
@@ -111,8 +114,8 @@ Walk::Walk()
   for (auto& c : leg_cmds_)
     c = nullptr;
 
-  for (auto& j : jnts_pos_cmd_)
-    j.resize(JntType::N_JNTS);
+//  for (auto& j : jnts_pos_cmd_)
+//    j.resize(JntType::N_JNTS);
 
   Loop_Count = 0;
 
@@ -219,57 +222,68 @@ void Walk::checkState() {
   switch (current_state_) {
   case WalkState::WK_INIT_POSE:
   {
+    ///! The command has send yet.
     if (!is_send_init_cmds_) return;
+    ///! Whether reach the target position.
     for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-      auto diff = (jnts_pos_cmd_[l] - leg_ifaces_[l]->joint_position_const_ref()).norm();
+      auto diff = (leg_cmds_[l]->target - leg_ifaces_[l]->joint_position_const_ref()).norm();
       if (diff > 0.1) return;
     }
     // It has reach the target positions.
-    // TODO
-    current_state_ = ((is_hang_walk_) ? WalkState::WK_MOVE_COG : WalkState::WK_WAITING);
-    // current_state_ = ((is_hang_walk_) ? WalkState::WK_HANG : WalkState::WK_WAITING);
     is_send_init_cmds_ = false;
-    PRESS_THEN_GO
 
-    int64_t span = 0;
-    timer_->stop(&span);
-    LOG_WARNING << "INIT POSE OK!(" << span << "ms)";
+    timer_->stop(&phase_time_span_);
+    LOG_WARNING << "*******----INIT POSE OK!("
+        << phase_time_span_ << "ms)----*******";
     PRINT_POSS_VS_TARGET
-    Loop_Count = 0;
+
+    PRESS_THEN_GO
+    current_state_ = ((is_hang_walk_) ?
+        WalkState::WK_MOVE_COG : WalkState::WK_WAITING);
     break;
   }
   case WalkState::WK_MOVE_COG:
+  {
+    if (!timer_->running()) {
+      Loop_Count    = 0;
+      sum_interval_ = 0;
+      timer_->start();
+    }
+
     if (Loop_Count >= coeff_->STANCE_TIME) {
       Loop_Count = 0;
-      next_foot_pt();
-      std::cout << "last_foot_pos: " <<  last_foot_pos_.transpose() << std::endl;
-      std::cout << "next_foot_pos: " <<  next_foot_pos_.transpose() << std::endl;
-      eef_trajectory();
-      LOG_WARNING << "*******----END MVOE  COG----*******";
-      timer_->stop();
-      sum_interval_  = 0;
+
+      timer_->stop(&phase_time_span_);
+      LOG_WARNING << "*******----END MVOE  COG("
+          << phase_time_span_ << "ms)----*******";
+
       current_state_ = WalkState::WK_SWING;
     }
     break;
+  }
   case WalkState::WK_SWING:
   {
-    if (!timer_->is_running()) {
+    if (!timer_->running()) {
+      prog_next_fpt();
+      eef_trajectory();
       sum_interval_ = 0;
       timer_->start();
-      return;
     }
 
     auto diff = (next_foot_pos_ - leg_ifaces_[swing_leg_]->eef()).norm();
     if ((LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state())
           || (diff < 0.3)) {
-      int64_t span = 0;
-      timer_->stop(&span);
+      timer_->stop(&phase_time_span_);
       delete eef_traj_;
       eef_traj_ = nullptr;
 
-      LOG_WARNING << "*******----END SWING LEG(" << span << "ms)----*******";
+      LOG_WARNING << "*******----END SWING LEG("
+          << phase_time_span_ << "ms)----*******";
+
+      __print_positions(leg_ifaces_[swing_leg_]->eef(), next_foot_pos_);
       PRESS_THEN_GO
 
+      ///! programe the next swing leg
       swing_leg_ = next_leg(swing_leg_);
       ///! Every twice swing leg then adjusting COG.
       if ((LegType::FL != swing_leg_) && (LegType::FR != swing_leg_)) {
@@ -278,16 +292,13 @@ void Walk::checkState() {
         Loop_Count = 0;
       } else {
         sum_interval_  = 0;
-        next_foot_pt();
+        prog_next_fpt();
         eef_trajectory();
       }
-    }
+    } // end if
     break;
   }
   case WalkState::WK_HANG:
-  {
-    break;
-  }
   default:
     LOG_ERROR << "What fucking walk state!";
     break;
@@ -295,15 +306,13 @@ void Walk::checkState() {
   }
 }
 
-StateMachineBase* Walk::state_machine() { return state_machine_; }
-
 //void Walk::prev_tick() {
 //  // gesture->updateImuData(imu_quat_[0], imu_quat_[1], imu_quat_[2]);
 //}
 
 void Walk::post_tick() {
   for (const auto& leg : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-    leg_ifaces_[leg]->legTarget(JntCmdType::CMD_POS, jnts_pos_cmd_[leg]);
+    leg_ifaces_[leg]->legTarget(*leg_cmds_[leg]);
     leg_ifaces_[leg]->move();
   }
 
@@ -335,7 +344,7 @@ void Walk::pose_init() {
   if (!is_send_init_cmds_) {
     Eigen::Vector3d _tmp(0, 0, -coeff_->STANCE_HEIGHT);
     FOR_EACH_LEG(l) {
-      leg_ifaces_[l]->inverseKinematics(_tmp, jnts_pos_cmd_[l]);
+      leg_ifaces_[l]->inverseKinematics(_tmp, leg_cmds_[l]->target);
     }
 //    for (auto& f : leg_ifaces_) {
 //      f->inverseKinematics(_tmp, jnts_pos_cmd_[0]);
@@ -363,7 +372,7 @@ void Walk::hang_walk() {
   PRESS_THEN_GO
 }
 
-void Walk::next_foot_pt() {
+void Walk::prog_next_fpt() {
   last_foot_pos_ = leg_ifaces_[swing_leg_]->eef();
   // last_foot_pos_ = foots_pos_[swing_leg_];
   // next_foot_pos_ << coeff_->FOOT_STEP, last_foot_pos_.y(), -coeff_->STANCE_HEIGHT;
@@ -372,8 +381,8 @@ void Walk::next_foot_pt() {
 }
 
 void Walk::move_cog() {
-  if (!timer_->is_running()) {
-    delta_cog_ = delta_cog(swing_leg_);
+  if (!timer_->running()) {
+    next_cog_proj_ = prog_next_cog(swing_leg_);
     timer_->start();
     sum_interval_ = 0;
   }
@@ -382,38 +391,24 @@ void Walk::move_cog() {
   if (sum_interval_ < tick_interval_) return;
   sum_interval_ = 0;
 
-//  if (Loop_Count <= 1) {
-//    delta_cog_ = delta_cog(swing_leg_);
-//  }
-
   Eigen::Vector3d _adj3d(0.0, 0.0, 0.0);
-  _adj3d.head(2) = stance_velocity(delta_cog_, Loop_Count);
+  _adj3d.head(2) = stance_velocity(next_cog_proj_, Loop_Count);
 
   Eigen::Vector3d _next_ft;
   FOR_EACH_LEG(l) {
     _next_ft = leg_ifaces_[l]->eef() - _adj3d;
-    leg_ifaces_[l]->inverseKinematics(_next_ft, jnts_pos_cmd_[l]);
+    leg_ifaces_[l]->inverseKinematics(_next_ft, leg_cmds_[l]->target);
   }
-  // cog_pos_assign(stance_velocity(delta_cog_, Loop_Count));
-  // reverse_kinematics();
   ++Loop_Count;
 }
 
 void Walk::swing_leg() {
-  if (nullptr == eef_traj_) {
-    LOG_ERROR << "What fucking trajectory.";
-    return;
-  }
-
-  if (!timer_->is_running() || (sum_interval_ > coeff_->SWING_TIME))
+  if (!timer_->running() || (timer_->span() > coeff_->SWING_TIME))
     return;
 
-  sum_interval_ += timer_->dt();
-  double dt = sum_interval_;
-  auto samp = eef_traj_->sample(dt/coeff_->SWING_TIME);
-
-  Eigen::Vector3d _xyz(samp.x(), samp.y(), samp.z());
-  leg_ifaces_[swing_leg_]->inverseKinematics(_xyz, jnts_pos_cmd_[swing_leg_]);
+  leg_ifaces_[swing_leg_]->inverseKinematics(
+      eef_traj_->sample((double)timer_->span()/coeff_->SWING_TIME),
+      leg_cmds_[swing_leg_]->target);
 }
 
 void Walk::eef_trajectory() {
@@ -447,12 +442,10 @@ void Walk::eef_trajectory() {
   // PRESS_THEN_GO
 }
 
-Eigen::Vector2d Walk::delta_cog(LegType leg) {
+Eigen::Vector2d Walk::prog_next_cog(LegType leg) {
   Eigen::Vector2d _cs, _p0, _p1, _p2, _p3;
   Eigen::Vector3d _s;
-//  for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-//    leg_ifaces_[l]->eef(foots_pos_[l]);
-//  }
+
   switch (leg)
   {
     case LegType::FL:
@@ -548,7 +541,7 @@ void Walk::walk() {
   ;
 }
 
-
+StateMachineBase* Walk::state_machine() { return state_machine_; }
 
 ///////////////////////////////////////////////////////////////////////////////
 ////////////        The implementation of inline methods         //////////////
@@ -634,6 +627,31 @@ void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
   printf(" HR =| %+7.04f| %+7.04f| %+7.04f| %+7.04f|\n",
       thr(JntType::YAW), thr(JntType::HIP), thr(JntType::KNEE), diff2);
   printf("-------------------------------------------------------------------------------------\n");
+}
+
+void __print_command(LegTarget** leg_cmds_) {
+  printf("_________________________________\n");
+  printf("LEG -|   YAW  |   HIP  |  KNEE  |\n");
+  printf(" FL -| %+7.04f| %+7.04f| %+7.04f|\n",
+      leg_cmds_[LegType::FL]->target(JntType::YAW),
+      leg_cmds_[LegType::FL]->target(JntType::HIP),
+      leg_cmds_[LegType::FL]->target(JntType::KNEE));
+
+  printf(" FR -| %+7.04f| %+7.04f| %+7.04f|\n",
+      leg_cmds_[LegType::FR]->target(JntType::YAW),
+      leg_cmds_[LegType::FR]->target(JntType::HIP),
+      leg_cmds_[LegType::FR]->target(JntType::KNEE));
+
+  printf(" HL -| %+7.04f| %+7.04f| %+7.04f|\n",
+      leg_cmds_[LegType::HL]->target(JntType::YAW),
+      leg_cmds_[LegType::HL]->target(JntType::HIP),
+      leg_cmds_[LegType::HL]->target(JntType::KNEE));
+
+  printf(" HR -| %+7.04f| %+7.04f| %+7.04f|\n",
+      leg_cmds_[LegType::HR]->target(JntType::YAW),
+      leg_cmds_[LegType::HR]->target(JntType::HIP),
+      leg_cmds_[LegType::HR]->target(JntType::KNEE));
+  printf("---------------------------------\n");
 }
 
 void __print_command(const Eigen::VectorXd* leg_cmds_) {
