@@ -109,15 +109,15 @@ protected:
   /*!
    * @brief The abstract method, is completed the joint trajectory target.
    */
-  virtual void followJntTrajectory(JntType, const Trajectory1d) = 0;
+  virtual void followJntTrajectory(JntType, const Trajectory1d&) = 0;
   /*!
    * @brief The abstract method, is completed the leg trajectory target.
    */
-  virtual void followJntTrajectory(const Trajectory3d) = 0;
+  virtual void followJntTrajectory(const Trajectory3d&) = 0;
   /*!
    * @brief The abstract method, is completed the end-effector trajectory target.
    */
-  virtual void followEefTrajectory(const Trajectory3d) = 0;
+  virtual void followEefTrajectory(const Trajectory3d&) = 0;
 
   virtual void executLeg(const LegTarget&);
   virtual void executJnt(const JntTarget&);

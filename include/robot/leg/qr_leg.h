@@ -23,9 +23,9 @@ public:
 
 ///! inherit from RobotLeg
 protected:
-  virtual void followJntTrajectory(JntType, const Trajectory1d) override;
-  virtual void followJntTrajectory(const Trajectory3d) override;
-  virtual void followEefTrajectory(const Trajectory3d) override;
+  virtual void followJntTrajectory(JntType, const Trajectory1d&) override;
+  virtual void followJntTrajectory(const Trajectory3d&) override;
+  virtual void followEefTrajectory(const Trajectory3d&) override;
 
 // inherit from MathLeg
 public:

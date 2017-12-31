@@ -78,7 +78,7 @@ Eigen::Vector2d __inner_heart(
 Eigen::Vector2d __line_section(
     const Eigen::Vector2d& A, const Eigen::Vector2d& B, double ratio);
 
-struct WalkCoeff {
+struct WalkParam {
   ///! The threshold for cog
   double THRES_COG;
   ///! The foot step
@@ -93,7 +93,7 @@ struct WalkCoeff {
   ///! The time for swing leg (in ms)
   int64_t   SWING_TIME;
 
-  WalkCoeff(const MiiString& _tag)
+  WalkParam(const MiiString& _tag)
     : THRES_COG(6.5),    FOOT_STEP(10),
       STANCE_HEIGHT(46), SWING_HEIGHT(5),
       COG_TIME(2000),    SWING_TIME(2000) {
@@ -121,7 +121,7 @@ Walk::Walk()
   for (auto& c : leg_cmds_)
     c = nullptr;
 
-  for (auto& t : eef2cog_traj_)
+  for (auto& t : cog2eef_traj_)
     t = nullptr;
 //  Loop_Count = 0;
 
@@ -193,7 +193,7 @@ bool Walk::init() {
   }
 
   _tag = Label::make_label(getLabel(), "coefficient");
-  coeff_ = new WalkCoeff(_tag);
+  coeff_ = new WalkParam(_tag);
 
   return true;
 }
@@ -219,7 +219,7 @@ bool Walk::starting() {
 
   timer_    = new TimeControl;
   eef_traj_ = new Trajectory3d;
-  for (auto& t : eef2cog_traj_)
+  for (auto& t : cog2eef_traj_)
     t = new Trajectory3d;
 
   LOG_INFO << "The walk gait has STARTED!";
@@ -230,7 +230,7 @@ void Walk::stopping() {
   delete eef_traj_;
   eef_traj_ = nullptr;
 
-  for (auto& t : eef2cog_traj_) {
+  for (auto& t : cog2eef_traj_) {
     delete t;
     t = nullptr;
   }
@@ -286,7 +286,7 @@ void Walk::checkState() {
       LOG_WARNING << "*******----END MVOE  COG("
           << _s_tmp_span << "ms)----*******";
 
-      Eigen::Vector3d _tcog = eef2cog_traj_[0]->sample(1);
+      Eigen::Vector3d _tcog = cog2eef_traj_[0]->sample(1);
       Eigen::Vector3d _cog(0.0, 0.0, 0.0);
       __print_positions(_cog, _tcog);
 
@@ -409,7 +409,7 @@ void Walk::move_cog() {
 
   FOR_EACH_LEG(l) {
     leg_ifaces_[l]->inverseKinematics(
-        eef2cog_traj_[l]->sample(dt), leg_cmds_[l]->target);
+        cog2eef_traj_[l]->sample(dt), leg_cmds_[l]->target);
   }
 }
 
@@ -465,8 +465,8 @@ void Walk::prog_cog_traj() {
       _coeff(i, 1) = _p1(i) - _coeff(i, 0);
     }
 
-    eef2cog_traj_[l]->reset(_coeff);
-    std::cout << *eef2cog_traj_[l] << std::endl;
+    cog2eef_traj_[l]->reset(_coeff);
+    std::cout << *cog2eef_traj_[l] << std::endl;
   }
 }
 

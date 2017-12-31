@@ -366,7 +366,7 @@ __get_int_vec(const _DataType& _t, const Eigen::Index& _exp) {
 
 
 #define TRAJ_MAKE_TYPEDEFS(Type, TypeSuffix, Size, SizeSuffix)   \
-typedef Trajectory<Type, Size> Trajectory##SizeSuffix##TypeSuffix;
+using Trajectory##SizeSuffix##TypeSuffix = Trajectory<Type, Size>;
 
 #define TRAJ_MAKE_TYPEDEFS_ALL_SIZES(Type, TypeSuffix) \
 TRAJ_MAKE_TYPEDEFS(Type, TypeSuffix, 1, 1) \

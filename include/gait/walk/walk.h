@@ -24,7 +24,6 @@
 
 ///! Forward declaration
 class TimeControl;
-// class Trajectory3d;
 
 namespace qr_control {
 
@@ -119,13 +118,15 @@ protected:
   ///! The commands of legs.
   class LegTarget*      leg_cmds_[LegType::N_LEGS];
   ///! Variables about gait control
-  class WalkCoeff* coeff_;
+  class WalkParam*      coeff_;
+
   ///! The time control
   TimeControl*     timer_;
+
   ///! The trajectory for swing leg
   Trajectory3d*    eef_traj_;
   ///! The trajectory for moving COG
-  Trajectory3d*    eef2cog_traj_[LegType::N_LEGS];
+  Trajectory3d*    cog2eef_traj_[LegType::N_LEGS];
 
   ///! The current swing leg
   LegType          swing_leg_;
@@ -140,11 +141,11 @@ protected:
 
 ///! These variables and methods are temporary.
 private:
-  // Eigen::Vector2d cog_proj1();
-  ///! The last position of swing leg
-  Eigen::Vector3d last_foot_pos1_;
-  ///! The target position of swing leg
-  Eigen::Vector3d next_foot_pos1_;
+//  Eigen::Vector2d cog_proj1();
+//  ///! The last position of swing leg
+//  Eigen::Vector3d last_foot_pos1_;
+//  ///! The target position of swing leg
+//  Eigen::Vector3d next_foot_pos1_;
   ///! Whether is hang?
   // bool            is_hang_walk_;
 //  Eigen::Vector2d stance_velocity(const Eigen::Vector2d&, int);
