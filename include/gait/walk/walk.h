@@ -30,8 +30,7 @@ namespace qr_control {
 
 enum WalkState {
   UNKNOWN_WK_STATE = -1,
-  WK_WAITING = 0,
-  WK_INIT_POSE,
+  WK_INIT_POSE = 0,
   WK_MOVE_COG,
   WK_SWING,
   WK_HANG,
@@ -68,8 +67,6 @@ protected:
 
 ///! These methods are the callback method for WalkState.
 private:
-  ///! The callback for WK_WAITING
-  void waiting();
   ///! The callback for WK_INIT_POSE
   void pose_init();
   ///! The callback for WK_MOVE_COG
@@ -83,6 +80,18 @@ private:
 
 ///! The helper for move COG and swing leg.
 private:
+  /*!
+   * @brief The criterion for WK_INIT_POS
+   */
+  bool end_pose_init();
+  /*!
+   * @brief The criterion for WK_MOVE_COG
+   */
+  bool end_move_cog();
+  /*!
+   * @brief The criterion for WK_SWING
+   */
+  bool end_swing_leg();
   /*!
    * @brief Update the next foot point for the swing leg.
    *        The default next foot point is {STEP, XX, -BH},
@@ -121,7 +130,8 @@ protected:
   ///! Variables about gait control
   class WalkParam*      params_;
 
-  ///! The time control
+  ///! The time control. this TimeControl will be started in the begin of
+  ///! each state, stopped in the end of each state.
   TimeControl*     timer_;
 
   ///! The trajectory for swing leg

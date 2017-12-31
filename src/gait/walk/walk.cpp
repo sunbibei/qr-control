@@ -204,8 +204,6 @@ bool Walk::init() {
 bool Walk::starting() {
   state_machine_ = new StateMachine<WalkState>(current_state_);
   state_machine_->registerStateCallback(
-      WalkState::WK_WAITING,   &Walk::waiting, this);
-  state_machine_->registerStateCallback(
       WalkState::WK_INIT_POSE, &Walk::pose_init, this);
   state_machine_->registerStateCallback(
       WalkState::WK_MOVE_COG,  &Walk::move_cog,  this);
@@ -242,11 +240,13 @@ void Walk::stopping() {
 }
 
 void Walk::checkState() {
-  // TODO
+  ///! the local static variable for every state time span.
   static int64_t _s_tmp_span = 0;
+
   switch (current_state_) {
   case WalkState::WK_INIT_POSE:
   {
+    ///! the begin of WK_INIT_POS
     if (!timer_->running()) {
       Eigen::Vector3d _tmp(0, 0, -params_->STANCE_HEIGHT);
       FOR_EACH_LEG(l) {
@@ -256,26 +256,21 @@ void Walk::checkState() {
       timer_->start();
     }
 
-    FOR_EACH_LEG(l) {
-      auto diff = (leg_ifaces_[l]->joint_position_const_ref()
-          - leg_cmds_[l]->target).norm();
-      ///! The different of any leg is bigger than 0.1 is considered as
-      ///! that the robot has not reach the initialization position.
-      if (diff > 0.1) return;
-    }
+    if (!end_pose_init()) return;
 
+    ///! the end of WK_INIT_POS
     timer_->stop(&_s_tmp_span);
     LOG_WARNING << "*******----INIT POSE OK!("
         << _s_tmp_span << "ms)----*******";
     PRINT_POSS_VS_TARGET
 
     PRESS_THEN_GO
-    // swing_leg_     = LegType::HL;
     current_state_ = WalkState::WK_MOVE_COG;
     break;
   }
   case WalkState::WK_MOVE_COG:
   {
+    ///! the begin of WK_MOVE_COG
     if (!timer_->running()) {
       prog_cog_traj();
 
@@ -284,23 +279,24 @@ void Walk::checkState() {
       timer_->start();
     }
 
-    if (timer_->span() > params_->COG_TIME) {
-      timer_->stop(&_s_tmp_span);
-      LOG_WARNING << "*******----END MVOE  COG("
-          << _s_tmp_span << "ms)----*******";
+    if (!end_move_cog()) return;
 
-      Eigen::Vector3d _tcog = cog2eef_traj_[0]->sample(1);
-      Eigen::Vector3d _cog(0.0, 0.0, 0.0);
-      __print_positions(_cog, _tcog);
+    ///! the end of WK_MOVE_COG
+    timer_->stop(&_s_tmp_span);
+    LOG_WARNING << "*******----END MVOE  COG("
+        << _s_tmp_span << "ms)----*******";
 
-      PRESS_THEN_GO
+    Eigen::Vector3d _tcog = cog2eef_traj_[0]->sample(1);
+    Eigen::Vector3d _cog(0.0, 0.0, 0.0);
+    __print_positions(_cog, _tcog);
 
-      current_state_ = WalkState::WK_SWING;
-    }
+    PRESS_THEN_GO
+    current_state_ = WalkState::WK_SWING;
     break;
   }
   case WalkState::WK_SWING:
   {
+    ///! the begin of WK_SWING
     if (!timer_->running()) {
       // prog_next_fpt();
       prog_eef_traj();
@@ -308,29 +304,27 @@ void Walk::checkState() {
       timer_->start();
     }
 
-    auto diff = (eef_traj_->sample(1) - leg_ifaces_[swing_leg_]->eef()).norm();
-    if ((LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state())
-          || (diff < 0.3) || timer_->span() > 2*params_->SWING_TIME) {
-      timer_->stop(&_s_tmp_span);
+    if (!end_swing_leg()) return;
 
-      LOG_WARNING << "*******----END SWING LEG("
-          << _s_tmp_span << "ms)----*******";
+    ///! the end of WK_SWING
+    timer_->stop(&_s_tmp_span);
+    LOG_WARNING << "*******----END SWING LEG("
+        << _s_tmp_span << "ms)----*******";
 
-      __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
-      PRESS_THEN_GO
+    __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
+    PRESS_THEN_GO
 
-      current_state_ = WalkState::WK_MOVE_COG;
-      return;
-      ///! programe the next swing leg
-      // swing_leg_ = next_leg(swing_leg_);
-      ///! Every twice swing leg then adjusting COG.
-      if ((LegType::FL != swing_leg_) && (LegType::FR != swing_leg_)) {
-        current_state_ = WalkState::WK_MOVE_COG;
-      } else {
-        // prog_next_fpt();
-        prog_eef_traj();
-      }
-    } // end if
+    current_state_ = WalkState::WK_MOVE_COG;
+    break;
+    ///! programe the next swing leg
+    // swing_leg_ = next_leg(swing_leg_);
+    ///! Every twice swing leg then adjusting COG.
+//    if ((LegType::FL != swing_leg_) && (LegType::FR != swing_leg_)) {
+//      current_state_ = WalkState::WK_MOVE_COG;
+//    } else {
+//      // prog_next_fpt();
+//      prog_eef_traj();
+//    }
     break;
   }
   case WalkState::WK_HANG:
@@ -378,12 +372,21 @@ void Walk::post_tick() {
 #endif
 }
 
-void Walk::waiting() {
-  PRESS_THEN_GO
+void Walk::pose_init() {
+  // Nothing to do here.
+  PRINT_POSS_VS_TARGET
 }
 
-void Walk::pose_init() {
-  PRINT_POSS_VS_TARGET
+bool Walk::end_pose_init() {
+
+  FOR_EACH_LEG(l) {
+    auto diff = (leg_ifaces_[l]->joint_position_const_ref()
+        - leg_cmds_[l]->target).norm();
+    ///! The different of any leg is bigger than 0.1 is considered as
+    ///! that the robot has not reach the initialization position.
+    if (diff > 0.1) return false;
+  }
+  return true;
 }
 
 ///! The flow of swing leg
@@ -416,6 +419,10 @@ void Walk::move_cog() {
   }
 }
 
+bool Walk::end_move_cog() {
+  return (timer_->span() > params_->COG_TIME);
+}
+
 void Walk::swing_leg() {
   if (!timer_->running() || (timer_->span() > params_->SWING_TIME))
     return;
@@ -423,6 +430,13 @@ void Walk::swing_leg() {
   leg_ifaces_[swing_leg_]->inverseKinematics(
       eef_traj_->sample((double)timer_->span()/params_->SWING_TIME),
       leg_cmds_[swing_leg_]->target);
+}
+
+bool Walk::end_swing_leg() {
+
+  auto diff = (eef_traj_->sample(1) - leg_ifaces_[swing_leg_]->eef()).norm();
+  return ((LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state())
+            || (diff < 0.3) || (timer_->span() > 2*params_->SWING_TIME));
 }
 
 void Walk::prog_eef_traj() {
@@ -810,14 +824,14 @@ void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
           double _min = _jnt->joint_position_min();
           double _max = _jnt->joint_position_max();
   #endif
-          if /*(JntType::HIP == j)*/ (js[l][leg](j) <= _min)
-            printf("| \033[31;1m%+7.04f\033[0m", js[l][leg](j));
+          if /*(JntType::HIP == j)*/ (js[l][leg + c](j) <= _min)
+            printf("| \033[31;1m%+7.04f\033[0m", js[l][leg + c](j));
           else if /*(JntType::KNEE == j)*/ (js[l][leg](j) >= _max)
-            printf("| \033[33;1m%+7.04f\033[0m", js[l][leg](j));
+            printf("| \033[33;1m%+7.04f\033[0m", js[l][leg + c](j));
           else
-            printf("| %+7.04f", js[l][leg](j));
+            printf("| %+7.04f", js[l][leg + c](j));
         }
-        auto diff = (js[1][leg+c] - js[0][leg+c]).norm();
+        auto diff = (js[1][leg + c] - js[0][leg + c]).norm();
         if (0 == l)
           printf("|    -   |");
         else
