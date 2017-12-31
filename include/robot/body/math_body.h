@@ -26,9 +26,10 @@ public:
   ///! The centre of gravity of robot
   virtual void cog(Eigen::Vector3d&)         = 0;
 
-public:
   ///! The translation of LegType shoulder(leg_base frame) of robot against the world frame.
-  virtual void leg_base(LegType, Eigen::Vector3d&) = 0;
+  virtual Eigen::Vector3d leg_base(LegType) = 0;
+
+  void leg_base(LegType _l, Eigen::Vector3d& _xyz) { _xyz = leg_base(_l); };
 };
 
 } /* namespace qr_control */

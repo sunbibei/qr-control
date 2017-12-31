@@ -51,7 +51,7 @@ public:
   // virtual void              prev_tick() override;
   virtual void              post_tick() override;
   virtual bool              starting()  override;
-  // virtual void              stopping()  override;
+  virtual void              stopping()  override;
 
 protected:
   WalkState                  current_state_;
@@ -64,11 +64,9 @@ protected:
   ///! The commands of legs. TODO Unused
   class LegTarget*      leg_cmds_[LegType::N_LEGS];
   ///! Whether is hang?
-  bool            is_hang_walk_;
-  ///! The Control tick interval(in ms)
-  int64_t         tick_interval_;
-  ///! The temporary tick interval(in ms)
-  int64_t         sum_interval_;
+  // bool            is_hang_walk_;
+  ///! The Control tick interval for send command(in ms)
+  int64_t         post_tick_interval_;
   ///! The last position of swing leg
   Eigen::Vector3d last_foot_pos_;
   ///! The target position of swing leg
@@ -79,16 +77,18 @@ protected:
   TimeControl*     timer_;
   ///! The current swing leg
   LegType          swing_leg_;
-  ///! The trajectory for end-effector
+  ///! The trajectory for swing leg
   Trajectory3d*    eef_traj_;
+  ///! The trajectory for moving COG
+  Trajectory3d*    eef2cog_traj_[LegType::N_LEGS];
   ///! The trajectory for joints
   Trajectory3d*    jnt_traj_;
 
 ///! These variable is temporary.
 private:
-  bool                  is_send_init_cmds_;
+  // bool                  is_send_init_cmds_;
   ///! The cog adjust vector
-  Eigen::Vector2d       next_cog_proj_;
+  Eigen::Vector2d       next_cog_proj1_;
   Eigen::Vector2d       swing_delta_cog_;
   ///! The temporary position variable using in the swing_leg
   Eigen::Vector3d       tmp_eef_pos_;
@@ -118,16 +118,21 @@ private:
 
 ///! The helper for move COG.
 private:
+  Eigen::Vector2d cog_proj1();
   Eigen::Vector2d prog_next_cog(LegType);
+
+
   Eigen::Vector2d stance_velocity(const Eigen::Vector2d&, int);
+  Eigen::Vector2d stance_velocity(const Eigen::Vector2d&, int64_t);
 
 ///! The helper for swing leg.
 private:
   void eef_trajectory();
-
+  void cog_trajectory();
 private:
   /*!
-   * @brief Choice the next swing leg @next by @curr LegType.
+   * @brief Choice the next swing leg @next by @curr LegType. This method
+   *        ONLY be called after the moving COG.
    *        The flow of swing leg is designed by this method.
    *        The order as follow:
    *        HL -> FL -> HR -> FR
@@ -141,11 +146,8 @@ private:
   void    prog_next_fpt();
 
   Eigen::Vector2d inner_triangle(const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
-/////////////////////////////////////////////////////////////
-///////////////////////// OLD CODE //////////////////////////
-/////////////////////////////////////////////////////////////
-private:
-  int Loop_Count;
+
+  // int Loop_Count;
 };
 
 } /* namespace qr_control */

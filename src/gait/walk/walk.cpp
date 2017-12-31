@@ -35,23 +35,31 @@ namespace qr_control {
 #define PRESS_THEN_GO        {LOG_WARNING << "Press any key to continue."; getchar();}
 
 ///! These are the inline functions forward declare.
+///! print joint position of the single leg
 void __print_positions(const Eigen::VectorXd&);
-
+///! print the v.s. result and different between joint position of the single leg
 void __print_positions(const Eigen::VectorXd& _jnt, const Eigen::VectorXd& _tjnt);
-
+///! print FPT(foot point) or COG(centre of gravity) coordinate.
+void __print_positions(const Eigen::Vector3d& _xyz);
+///! print the v.s. result and different between FPT or COG
 void __print_positions(const Eigen::Vector3d& _xyz, const Eigen::Vector3d& _txyz);
-
+///! print the joint position of the all of leg.
 void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
     const Eigen::VectorXd& hl, const Eigen::VectorXd& hr);
-
+///! print the PFT of the all of leg.
+void __print_positions(const Eigen::Vector3d& fl, const Eigen::Vector3d& fr,
+    const Eigen::Vector3d& hl, const Eigen::Vector3d& hr);
+///! print the v.s. result and different between joint position of the all of leg.
 void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
     const Eigen::VectorXd& hl, const Eigen::VectorXd& hr,
     const Eigen::VectorXd& tfl, const Eigen::VectorXd& tfr,
     const Eigen::VectorXd& thl, const Eigen::VectorXd& thr);
-
+///! print the joint commands.
 void __print_command(LegTarget**);
-
+///! print the joint commands. (TODO
 void __print_command(const Eigen::VectorXd*);
+
+Eigen::Vector2d __incenter(const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
 
 void __cycloid_position(
       const Eigen::Vector3d&, const Eigen::Vector3d&, int, int, int, Eigen::Vector3d&);
@@ -77,23 +85,25 @@ struct WalkCoeff {
   double FOOT_STEP;
   ///! The height value when the robot stay stance.
   double STANCE_HEIGHT;
-  ///! The time for stance
-  int    STANCE_TIME;
   ///! The height value when swing leg.
   double SWING_HEIGHT;
+
+  ///! The time for moving COG(in ms)
+  int64_t   COG_TIME;
   ///! The time for swing leg (in ms)
   int64_t   SWING_TIME;
 
   WalkCoeff(const MiiString& _tag)
     : THRES_COG(6.5),    FOOT_STEP(10),
-      STANCE_HEIGHT(46), STANCE_TIME(50),
-      SWING_HEIGHT(5),   SWING_TIME(2000) {
+      STANCE_HEIGHT(46), SWING_HEIGHT(5),
+      COG_TIME(2000),    SWING_TIME(2000) {
     auto cfg = MiiCfgReader::instance();
     cfg->get_value(_tag, "cog_threshold", THRES_COG);
-    cfg->get_value(_tag, "step",     FOOT_STEP);
+    cfg->get_value(_tag, "step",         FOOT_STEP);
     cfg->get_value(_tag, "stance_height",STANCE_HEIGHT);
-    cfg->get_value(_tag, "stance_time",  STANCE_TIME);
     cfg->get_value(_tag, "swing_height", SWING_HEIGHT);
+
+    cfg->get_value(_tag, "cog_time",     COG_TIME);
     cfg->get_value(_tag, "swing_time",   SWING_TIME);
   }
 };
@@ -101,12 +111,13 @@ struct WalkCoeff {
 Walk::Walk()
   : current_state_(WalkState::UNKNOWN_WK_STATE),
     state_machine_(nullptr), body_iface_(nullptr),
-    is_hang_walk_(false), tick_interval_(50),
-    sum_interval_(0), coeff_(nullptr),
-    timer_(nullptr), swing_leg_(LegType::HL),
-    eef_traj_(nullptr), jnt_traj_(nullptr),
+    /*is_hang_walk_(false),*/ post_tick_interval_(50),
+    /*sum_interval_(0),*/ coeff_(nullptr),
+    timer_(nullptr), swing_leg_(LegType::UNKNOWN_LEG),
+    eef_traj_(nullptr), /*eef2cog_traj_(nullptr),*/
+    jnt_traj_(nullptr),
     /* These variables are the private. */
-    is_send_init_cmds_(false), phase_time_span_(0)
+    /*is_send_init_cmds_(false),*/ phase_time_span_(0)
 {
   for (auto& iface : leg_ifaces_)
     iface = nullptr;
@@ -114,10 +125,9 @@ Walk::Walk()
   for (auto& c : leg_cmds_)
     c = nullptr;
 
-//  for (auto& j : jnts_pos_cmd_)
-//    j.resize(JntType::N_JNTS);
-
-  Loop_Count = 0;
+  for (auto& t : eef2cog_traj_)
+    t = nullptr;
+//  Loop_Count = 0;
 
 #ifdef PUB_ROS_TOPIC
   nh_.reset(new ros::NodeHandle("~"));
@@ -146,8 +156,8 @@ bool Walk::init() {
   if (!GaitBase::init()) return false;
 
   auto cfg = MiiCfgReader::instance();
-  cfg->get_value(getLabel(), "hang",     is_hang_walk_);
-  cfg->get_value(getLabel(), "interval", tick_interval_);
+  // cfg->get_value(getLabel(), "hang",     is_hang_walk_);
+  cfg->get_value(getLabel(), "interval", post_tick_interval_);
 
   MiiString label;
   int count      = 0;
@@ -211,10 +221,23 @@ bool Walk::starting() {
       std_msgs::Float64MultiArray>(*nh_, "/dragon/joint_commands", 10));
 #endif
 
-  timer_ = new TimeControl;
-  timer_->start();
+  timer_    = new TimeControl;
+  eef_traj_ = new Trajectory3d;
+  for (auto& t : eef2cog_traj_)
+    t = new Trajectory3d;
+  // timer_->start();
   LOG_INFO << "The walk gait has started!";
   return true;
+}
+
+void Walk::stopping() {
+  delete eef_traj_;
+  eef_traj_ = nullptr;
+
+  for (auto& t : eef2cog_traj_) {
+    delete t;
+    t = nullptr;
+  }
 }
 
 void Walk::checkState() {
@@ -222,15 +245,22 @@ void Walk::checkState() {
   switch (current_state_) {
   case WalkState::WK_INIT_POSE:
   {
-    ///! The command has send yet.
-    if (!is_send_init_cmds_) return;
-    ///! Whether reach the target position.
-    for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-      auto diff = (leg_cmds_[l]->target - leg_ifaces_[l]->joint_position_const_ref()).norm();
+    if (!timer_->running()) {
+      Eigen::Vector3d _tmp(0, 0, -coeff_->STANCE_HEIGHT);
+      FOR_EACH_LEG(l) {
+        leg_ifaces_[l]->inverseKinematics(_tmp, leg_cmds_[l]->target);
+      }
+
+      timer_->start();
+    }
+
+    FOR_EACH_LEG(l) {
+      auto diff = (leg_ifaces_[l]->joint_position_const_ref()
+          - leg_cmds_[l]->target).norm();
+      ///! The different of any leg is bigger than 0.1 is considered as
+      ///! that the robot has not reach the initialization position.
       if (diff > 0.1) return;
     }
-    // It has reach the target positions.
-    is_send_init_cmds_ = false;
 
     timer_->stop(&phase_time_span_);
     LOG_WARNING << "*******----INIT POSE OK!("
@@ -238,25 +268,55 @@ void Walk::checkState() {
     PRINT_POSS_VS_TARGET
 
     PRESS_THEN_GO
-    current_state_ = ((is_hang_walk_) ?
-        WalkState::WK_MOVE_COG : WalkState::WK_WAITING);
+    // swing_leg_     = LegType::HL;
+    current_state_ = WalkState::WK_MOVE_COG;
     break;
   }
   case WalkState::WK_MOVE_COG:
   {
     if (!timer_->running()) {
-      Loop_Count    = 0;
-      sum_interval_ = 0;
+//      Loop_Count = 0;
+//      next_cog_proj_ = prog_next_cog(swing_leg_);
+//      std::cout << " - " << cog_proj().transpose() << std::endl;
+//      std::cout << " = " << next_cog_proj_.transpose() << std::endl;
+//      swing_leg_ = next_leg(swing_leg_);
+      cog_trajectory();
+
+      PRESS_THEN_GO
+
+      swing_leg_ = next_leg(swing_leg_);
       timer_->start();
     }
+//    if (Loop_Count > 50) {
+//      timer_->stop(&phase_time_span_);
+//      LOG_WARNING << "*******----END MVOE  COG("
+//          << phase_time_span_ << "ms)----*******";
+//
+//      Eigen::Vector3d _tcog(0.0, 0.0,0.0);
+//      Eigen::Vector3d _cog(0.0, 0.0, 0.0/*body_iface_->body_height()*/);
+//      _tcog.head(2) = next_cog_proj_;
+//      _cog.head(2)  = cog_proj();
+//      __print_positions(_cog, _tcog);
+//
+//      PRESS_THEN_GO
+//      current_state_ = WalkState::WK_SWING;
+//    }
 
-    if (Loop_Count >= coeff_->STANCE_TIME) {
-      Loop_Count = 0;
-
+    if (timer_->span() > coeff_->COG_TIME) {
       timer_->stop(&phase_time_span_);
-      LOG_WARNING << "*******----END MVOE  COG("
-          << phase_time_span_ << "ms)----*******";
+      LOG_WARNING << "*******----END MVOE  COG(" << phase_time_span_
+          << "ms)----*******";
 
+      Eigen::Vector3d _tcog = eef2cog_traj_[0]->sample(1);
+      Eigen::Vector3d _cog(0.0, 0.0, 0.0/*body_iface_->body_height()*/);
+      // _cog.head(2)  = cog_proj();
+      __print_positions(_cog, _tcog);
+
+//      std::cout << swing_leg_ << std::endl;
+      PRESS_THEN_GO
+
+//      delete eef2cog_traj_;
+//      eef2cog_traj_  = nullptr;
       current_state_ = WalkState::WK_SWING;
     }
     break;
@@ -266,16 +326,14 @@ void Walk::checkState() {
     if (!timer_->running()) {
       prog_next_fpt();
       eef_trajectory();
-      sum_interval_ = 0;
+      // sum_interval_ = 0;
       timer_->start();
     }
 
     auto diff = (next_foot_pos_ - leg_ifaces_[swing_leg_]->eef()).norm();
     if ((LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state())
-          || (diff < 0.3)) {
+          || (diff < 0.3) || timer_->span() > 2*coeff_->SWING_TIME) {
       timer_->stop(&phase_time_span_);
-      delete eef_traj_;
-      eef_traj_ = nullptr;
 
       LOG_WARNING << "*******----END SWING LEG("
           << phase_time_span_ << "ms)----*******";
@@ -283,15 +341,14 @@ void Walk::checkState() {
       __print_positions(leg_ifaces_[swing_leg_]->eef(), next_foot_pos_);
       PRESS_THEN_GO
 
+      current_state_ = WalkState::WK_MOVE_COG;
+      return;
       ///! programe the next swing leg
-      swing_leg_ = next_leg(swing_leg_);
+      // swing_leg_ = next_leg(swing_leg_);
       ///! Every twice swing leg then adjusting COG.
       if ((LegType::FL != swing_leg_) && (LegType::FR != swing_leg_)) {
         current_state_ = WalkState::WK_MOVE_COG;
-        // timer_->start();
-        Loop_Count = 0;
       } else {
-        sum_interval_  = 0;
         prog_next_fpt();
         eef_trajectory();
       }
@@ -311,15 +368,23 @@ void Walk::checkState() {
 //}
 
 void Walk::post_tick() {
+  ///! The command frequency control
+  static TimeControl _s_post_tick(true);
+  static int64_t     _s_sum_interval = 0;
+  _s_sum_interval += _s_post_tick.dt();
+  if (_s_sum_interval < post_tick_interval_) return;
+  _s_sum_interval = 0;
+
   for (const auto& leg : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
     leg_ifaces_[leg]->legTarget(*leg_cmds_[leg]);
     leg_ifaces_[leg]->move();
   }
 
-  if (nullptr != eef_traj_) {
+
+  if (current_state_ == WalkState::WK_SWING) {
     __print_positions(leg_ifaces_[swing_leg_]->eef(), next_foot_pos_);
   } else
-   PRINT_COMMAND
+    PRINT_POSS_VS_TARGET// PRINT_COMMAND
 
 #ifdef PUB_ROS_TOPIC
   if(cmd_pub_->trylock()) {
@@ -341,29 +406,30 @@ void Walk::waiting() {
 
 void Walk::pose_init() {
   // only send the joint command once.
-  if (!is_send_init_cmds_) {
-    Eigen::Vector3d _tmp(0, 0, -coeff_->STANCE_HEIGHT);
-    FOR_EACH_LEG(l) {
-      leg_ifaces_[l]->inverseKinematics(_tmp, leg_cmds_[l]->target);
-    }
+  // if (!is_send_init_cmds_) {
+//    Eigen::Vector3d _tmp(0, 0, -coeff_->STANCE_HEIGHT);
+//    FOR_EACH_LEG(l) {
+//      leg_ifaces_[l]->inverseKinematics(_tmp, leg_cmds_[l]->target);
+//    }
 //    for (auto& f : leg_ifaces_) {
 //      f->inverseKinematics(_tmp, jnts_pos_cmd_[0]);
 //    }
     // reverse_kinematics();
-  }
+  // }
 
-  is_send_init_cmds_ = true;
+  // is_send_init_cmds_ = true;
   PRINT_POSS_VS_TARGET
 }
 
 ///! The flow of swing leg
+///! This method only be called after the moving COG
 LegType Walk::next_leg(const LegType curr) {
   switch (curr) {
   case LegType::FL: return LegType::HR;
   case LegType::FR: return LegType::HL;
   case LegType::HL: return LegType::FL;
   case LegType::HR: return LegType::FR;
-  default: return LegType::UNKNOWN_LEG;
+  default: return LegType::HL; ///! The first swing HL leg.
   }
 }
 
@@ -381,25 +447,32 @@ void Walk::prog_next_fpt() {
 }
 
 void Walk::move_cog() {
-  if (!timer_->running()) {
-    next_cog_proj_ = prog_next_cog(swing_leg_);
-    timer_->start();
-    sum_interval_ = 0;
-  }
-
-  sum_interval_ += timer_->dt();
-  if (sum_interval_ < tick_interval_) return;
-  sum_interval_ = 0;
+  if (!timer_->running() || (timer_->span() > coeff_->COG_TIME))
+    return;
 
   Eigen::Vector3d _adj3d(0.0, 0.0, 0.0);
-  _adj3d.head(2) = stance_velocity(next_cog_proj_, Loop_Count);
+  // _adj3d.head(2) = stance_velocity(next_cog_proj_, timer_->span());
+  // _adj3d.head(2) = stance_velocity(next_cog_proj_, Loop_Count);
+
+  // double T  = coeff_->COG_TIME;
+  double dt = timer_->span();
+  dt /= coeff_->COG_TIME;
+
+  Eigen::Vector3d _dcog;
+  // _dcog.head(2) -= cog_proj();
+  // std::cout << "delta: " << _dcog.transpose() << std::endl;
+  // PRESS_THEN_GO
 
   Eigen::Vector3d _next_ft;
   FOR_EACH_LEG(l) {
-    _next_ft = leg_ifaces_[l]->eef() - _adj3d;
-    leg_ifaces_[l]->inverseKinematics(_next_ft, leg_cmds_[l]->target);
+    // if (l == swing_leg_) continue;
+//    ;
+//    _next_ft = leg_ifaces_[l]->eef();
+//    _next_ft.head(2) = -_dcog.head(2);
+    // _next_ft.z() = -_next_ft.z();
+    leg_ifaces_[l]->inverseKinematics(eef2cog_traj_[l]->sample(dt), leg_cmds_[l]->target);
   }
-  ++Loop_Count;
+  // ++Loop_Count;
 }
 
 void Walk::swing_leg() {
@@ -412,7 +485,6 @@ void Walk::swing_leg() {
 }
 
 void Walk::eef_trajectory() {
-  // TODO
   const auto& _p0 = last_foot_pos_;
   const auto& _p1 = next_foot_pos_;
 
@@ -420,12 +492,12 @@ void Walk::eef_trajectory() {
   A << 1,   0,    0,
        1,   1,    1,
        1, 0.5, 0.25;
-  // std::cout << "A:\n" << A << std::endl;
+
   Eigen::Matrix3d b;
   b.row(0) = _p0;
   b.row(1) = _p1;
   b.row(2) << (_p0.x()/2 + _p1.x()/2), _p0.y(), (_p0.z() + coeff_->SWING_HEIGHT);
-  // std::cout << "b:\n" << b << std::endl;
+
   Eigen::Matrix3d c;
   if (0 == A.determinant()) {
     c = A.householderQr().solve(b);
@@ -434,56 +506,176 @@ void Walk::eef_trajectory() {
     c = A.partialPivLu().solve(b);
   }
 
-  delete eef_traj_;
-  // Trajectory3d::CoeffMat traj_c;
-  // traj_c
-  eef_traj_ = new Trajectory3d(c.transpose());
-  // std::cout << "Trajectory:\n" << *eef_traj_ << std::endl;
-  // PRESS_THEN_GO
+  eef_traj_->reset(c.transpose());
+  std::cout << "Trajectory:\n" << *eef_traj_ << std::endl;
 }
 
-Eigen::Vector2d Walk::prog_next_cog(LegType leg) {
-  Eigen::Vector2d _cs, _p0, _p1, _p2, _p3;
-  Eigen::Vector3d _s;
+void Walk::cog_trajectory() {
+  Eigen::Vector3d _p0(0.0, 0.0, -coeff_->STANCE_HEIGHT);
+  Eigen::Vector3d _p1(0.0, 0.0, -coeff_->STANCE_HEIGHT);
+  Eigen::Vector2d _tmp_next_cog = prog_next_cog(swing_leg_);
 
-  switch (leg)
-  {
-    case LegType::FL:
-    case LegType::HL:
-      // TODO
-      body_iface_->leg_base(LegType::FL, _s);
-      _p0 = (leg_ifaces_[LegType::FL]->eef() + _s).head(2);
+  FOR_EACH_LEG(l) {
+    _p0 = leg_ifaces_[l]->eef();
+    _p1.head(2) = _p0.head(2) - _tmp_next_cog.head(2);
 
-      body_iface_->leg_base(LegType::HR, _s);
-      _p1 = (leg_ifaces_[LegType::HR]->eef() + _s).head(2);
+    Trajectory3d::CoeffMat _coeff;
+    _coeff.resize(Eigen::NoChange, 2); // linear
+    for (int i = 0; i < _coeff.rows(); ++i) {
+      _coeff(i, 0) = _p0(i);
+      _coeff(i, 1) = _p1(i) - _coeff(i, 0);
+    }
 
-      body_iface_->leg_base(LegType::FR, _s);
-      _p2 = (leg_ifaces_[LegType::FR]->eef() + _s).head(2);
+    eef2cog_traj_[l]->reset(_coeff);
+    std::cout << *eef2cog_traj_[l] << std::endl;
+  }
+}
 
-      body_iface_->leg_base(LegType::HL, _s);
-      _p3 = (leg_ifaces_[LegType::HL]->eef() + _s).head(2);
-      break;
-    case LegType::FR:
-    case LegType::HR:
-      body_iface_->leg_base(LegType::FL, _s);
-      _p2 = (leg_ifaces_[LegType::FL]->eef() + _s).head(2);
+Eigen::Vector2d Walk::cog_proj1() {
+  if (LegType::UNKNOWN_LEG == swing_leg_)
+    return Eigen::Vector2d(0.0, 0.0);
 
-      body_iface_->leg_base(LegType::HR, _s);
-      _p3 = (leg_ifaces_[LegType::HR]->eef() + _s).head(2);
-
-      body_iface_->leg_base(LegType::FR, _s);
-      _p0 = (leg_ifaces_[LegType::FR]->eef() + _s).head(2);
-
-      body_iface_->leg_base(LegType::HL, _s);
-      _p1 = (leg_ifaces_[LegType::HL]->eef() + _s).head(2);
-      break;
-    default:
-      LOG_WARNING << "What fucking code with LEG!";
-      return Eigen::Vector2d(0.0, 0.0);
+  double _x = 0;
+  double _y = 0;
+  Eigen::Vector2d _eef_proj(0.0, 0.0);
+  FOR_EACH_LEG(l) {
+    if (swing_leg_ == l) continue;
+    _eef_proj = (leg_ifaces_[l]->eef()
+        + body_iface_->leg_base(l)).head(2);
+    _x += _eef_proj.x();
+    _y += _eef_proj.y();
   }
 
-  __cross_point(_p0, _p1, _p2, _p3, _cs);
-  return inner_triangle(_cs, _p2, _p1);
+  return Eigen::Vector2d(_x, _y);
+
+  Eigen::Vector2d _cs, _p0, _p1, _p2, _p3;
+  _p2 = (leg_ifaces_[LegType::FL]->eef()
+      + body_iface_->leg_base(LegType::FL)).head(2);
+
+  _p3 = (leg_ifaces_[LegType::HR]->eef()
+      + body_iface_->leg_base(LegType::HR)).head(2);
+
+  _p0 = (leg_ifaces_[LegType::FR]->eef()
+      + body_iface_->leg_base(LegType::FR)).head(2);
+
+  _p1 = (leg_ifaces_[LegType::HL]->eef()
+      + body_iface_->leg_base(LegType::HL)).head(2);
+
+  return _cs;
+}
+
+Eigen::Vector2d Walk::prog_next_cog(LegType) {
+  Eigen::Vector2d _next_cog_proj(0.0, 0.0), _p[3];
+  Eigen::Vector2d _last_cog_proj(0.0, 0.0)/* = cog_proj()*/;
+
+  LegType _next_leg = next_leg(swing_leg_);
+
+  int idx = 0;
+  FOR_EACH_LEG(l) {
+    if (l == _next_leg) continue;
+    _p[idx++] = (leg_ifaces_[l]->eef()
+        + body_iface_->leg_base(l)).head(2);
+  }
+
+  return __incenter(_p[0], _p[1], _p[2]);
+
+//  if ((LegType::FL == _swing_leg) || (LegType::HL == _swing_leg)) {
+//    _p0 = (leg_ifaces_[LegType::FR]->eef()
+//        + body_iface_->leg_base(LegType::FR)).head(2);
+//    _p1 = (leg_ifaces_[LegType::HR]->eef()
+//        + body_iface_->leg_base(LegType::HR)).head(2);
+//    _next_cog_proj = __incentre(_last_cog_proj, _p0, _p1);
+//  } else if ((LegType::FL == _swing_leg) || (LegType::HL == _swing_leg)) {
+//    _p0 = (leg_ifaces_[LegType::FL]->eef()
+//        + body_iface_->leg_base(LegType::FL)).head(2);
+//    _p1 = (leg_ifaces_[LegType::HL]->eef()
+//              + body_iface_->leg_base(LegType::HL)).head(2);
+//    _next_cog_proj = inner_triangle(_last_cog_proj, _p0, _p1);
+//  }
+//  return _next_cog_proj;
+
+//  if ((LegType::FL == swing_leg_) || (LegType::HL == swing_leg_)) {
+//    _p0 = (leg_ifaces_[LegType::FR]->eef()
+//        + body_iface_->leg_base(LegType::FR)).head(2);
+//    _p1 = (leg_ifaces_[LegType::HR]->eef()
+//        + body_iface_->leg_base(LegType::HR)).head(2);
+//    _next_cog_proj = inner_triangle(_last_cog_proj,_p0, _p1);
+//  } else {
+//    _p0 = (leg_ifaces_[LegType::FL]->eef()
+//        + body_iface_->leg_base(LegType::FL)).head(2);
+//    _p1 = (leg_ifaces_[LegType::HL]->eef()
+//              + body_iface_->leg_base(LegType::HL)).head(2);
+//    _next_cog_proj = inner_triangle(_last_cog_proj, _p0, _p1);
+//  }
+//  return _next_cog_proj;
+
+//  Eigen::Vector2d _cs, _p0, _p1, _p2, _p3;
+//  Eigen::Vector3d _s;
+//
+//  switch (leg)
+//  {
+//    case LegType::FL:
+//    case LegType::HL:
+//      // TODO
+//      // body_iface_->leg_base(LegType::FL, _s);
+//      _p0 = (leg_ifaces_[LegType::FL]->eef()
+//          + body_iface_->leg_base(LegType::FL)).head(2);
+//
+//      // body_iface_->leg_base(LegType::HR, _s);
+//      _p1 = (leg_ifaces_[LegType::HR]->eef()
+//          + body_iface_->leg_base(LegType::HR)).head(2);
+//
+//      // body_iface_->leg_base(LegType::FR, _s);
+//      _p2 = (leg_ifaces_[LegType::FR]->eef()
+//          + body_iface_->leg_base(LegType::FR)).head(2);
+//
+//      // body_iface_->leg_base(LegType::HL, _s);
+//      _p3 = (leg_ifaces_[LegType::HL]->eef()
+//          + body_iface_->leg_base(LegType::HL)).head(2);
+//      break;
+//    case LegType::FR:
+//    case LegType::HR:
+//      // body_iface_->leg_base(LegType::FL, _s);
+//      _p2 = (leg_ifaces_[LegType::FL]->eef()
+//          + body_iface_->leg_base(LegType::FL)).head(2);
+//
+//      // body_iface_->leg_base(LegType::HR, _s);
+//      _p3 = (leg_ifaces_[LegType::HR]->eef()
+//          + body_iface_->leg_base(LegType::HR)).head(2);
+//
+//      // body_iface_->leg_base(LegType::FR, _s);
+//      _p0 = (leg_ifaces_[LegType::FR]->eef()
+//          + body_iface_->leg_base(LegType::FR)).head(2);
+//
+//      // body_iface_->leg_base(LegType::HL, _s);
+//      _p1 = (leg_ifaces_[LegType::HL]->eef()
+//          + body_iface_->leg_base(LegType::HL)).head(2);
+//      break;
+//    default:
+//      LOG_WARNING << "What fucking code with LEG!";
+//      return Eigen::Vector2d(0.0, 0.0);
+//  }
+//
+//  _cs = cog_proj();
+//  std::cout << "cs1: " << _cs.transpose() << std::endl;
+//
+//  __cross_point(_p0, _p1, _p2, _p3, _cs);
+//  std::cout << "cs1: " << _cs.transpose() << std::endl;
+//
+//  Eigen::Vector2d it = inner_triangle(_cs, _p2, _p1);
+//
+//
+//
+//  std::cout << "p0: " << _p0.transpose() << std::endl;
+//  std::cout << "p1: " << _p1.transpose() << std::endl;
+//  std::cout << "p2: " << _p2.transpose() << std::endl;
+//  std::cout << "p3: " << _p3.transpose() << std::endl;
+//  std::cout << "cs: " << _cs.transpose() << std::endl;
+//  std::cout << "it: " << it.transpose() << std::endl;
+//
+//  return it;
+
+  // return inner_triangle(_cs, _p2, _p1);
 }
 
 Eigen::Vector2d Walk::inner_triangle(
@@ -522,16 +714,35 @@ Eigen::Vector2d Walk::inner_triangle(
   }
 }
 
+Eigen::Vector2d Walk::stance_velocity(const Eigen::Vector2d& _target_cog, int64_t _span) {
+  double T  = coeff_->COG_TIME;
+  double dt = _span / T;
+
+  // TODO
+  // Eigen::Vector3d samp = eef2cog_traj_->sample(dt);
+  // return (samp.head(2) - _target_cog);
+
+  Eigen::Vector2d stance_vel(0.0, 0.0);
+  stance_vel.x() = (30 * _target_cog.x() * pow(dt, 4)
+      - 60 * _target_cog.x() * pow(dt, 3)
+      + 30 * _target_cog.x() * pow(dt, 2)) / T;
+
+  stance_vel.y() = (30 * _target_cog.y() * pow(dt, 4)
+      - 60 * _target_cog.y() * pow(dt, 3)
+      + 30 * _target_cog.y() * pow(dt, 2)) / T;
+  return stance_vel;
+}
+
 Eigen::Vector2d Walk::stance_velocity(const Eigen::Vector2d& Adj_vec, int Loop) {
 
   Eigen::Vector2d stance_vel(0.0, 0.0);
-  stance_vel.x() = 30 * Adj_vec.x() * pow(Loop,4) / pow(coeff_->STANCE_TIME, 5)
-      - 60 * Adj_vec.x() * pow(Loop,3) / pow(coeff_->STANCE_TIME, 4)
-      + 30 * Adj_vec.x() * pow(Loop,2) / pow(coeff_->STANCE_TIME, 3);
+  stance_vel.x() = 30 * Adj_vec.x() * pow(Loop,4) / pow(50, 5)
+      - 60 * Adj_vec.x() * pow(Loop,3) / pow(50, 4)
+      + 30 * Adj_vec.x() * pow(Loop,2) / pow(50, 3);
 
-  stance_vel.y() = 30 * Adj_vec.y() * pow(Loop,4) / pow(coeff_->STANCE_TIME, 5)
-      - 60 * Adj_vec.y() * pow(Loop,3) / pow(coeff_->STANCE_TIME, 4)
-      + 30 * Adj_vec.y() * pow(Loop,2) / pow(coeff_->STANCE_TIME, 3);
+  stance_vel.y() = 30 * Adj_vec.y() * pow(Loop,4) / pow(50, 5)
+      - 60 * Adj_vec.y() * pow(Loop,3) / pow(50, 4)
+      + 30 * Adj_vec.y() * pow(Loop,2) / pow(50, 3);
   return stance_vel;
 }
 
@@ -567,15 +778,24 @@ void __print_positions(const Eigen::VectorXd& _jnt, const Eigen::VectorXd& _tjnt
   printf("-------------------------------------------\n");
 }
 
+void __print_positions(const Eigen::Vector3d& _xyz) {
+  printf("____________________________________________\n");
+  printf("| -|    X    |    Y    |    Z    |  ERROR  |\n");
+//printf("| -| +00.0000| +00.0000| +00.0000| +00.0000|\n");
+  printf("| -| %+8.04f| %+8.04f| %+8.04f|    -    |\n",
+      _xyz.x(), _xyz.y(), _xyz.z());
+  printf("--------------------------------------------\n");
+}
+
 void __print_positions(const Eigen::Vector3d& _xyz, const Eigen::Vector3d& _txyz) {
   auto diff = (_txyz - _xyz).norm();
   printf("____________________________________________\n");
   printf("| -|    X    |    Y    |    Z    |  ERROR  |\n");
 //printf("| -| +00.0000| +00.0000| +00.0000| +00.0000|\n");
   printf("| -| %+8.04f| %+8.04f| %+8.04f|    -    |\n",
-      _xyz(JntType::YAW), _xyz(JntType::HIP), _xyz(JntType::KNEE));
+      _xyz.x(), _xyz.y(), _xyz.z());
   printf("| =| %+8.04f| %+8.04f| %+8.04f| %+8.04f|\n",
-      _txyz(JntType::YAW), _txyz(JntType::HIP), _txyz(JntType::KNEE), diff);
+      _txyz.x(), _txyz.y(), _txyz.z(), diff);
   printf("--------------------------------------------\n");
 }
 
@@ -593,6 +813,23 @@ void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
       hl(JntType::YAW), hl(JntType::HIP), hl(JntType::KNEE));
   printf(" HR -| %+7.04f| %+7.04f| %+7.04f|\n",
       hr(JntType::YAW), hr(JntType::HIP), hr(JntType::KNEE));
+  printf("-------------------------------------------------------------------\n");
+}
+
+void __print_positions(const Eigen::Vector3d& fl, const Eigen::Vector3d& fr,
+    const Eigen::Vector3d& hl, const Eigen::Vector3d& hr) {
+  printf("___________________________________________________________________\n");
+  printf("|LEG -|    X   |    Y    |    Z    |\n");
+//printf("LEG -| +00.0000| +00.0000| +00.0000|LEG -| +0.0000| +0.0000| +0.0000|\n");
+  printf("| FL -| %+8.04f| %+8.04f| %+8.04f|\n",
+      fl.x(), fl.y(), fl.z());
+  printf("| FR -| %+8.04f| %+8.04f| %+8.04f|\n",
+      fr.x(), fr.y(), fr.z());
+
+  printf("| HL -| %+8.04f| %+8.04f| %+8.04f|\n",
+      hl.x(), hl.y(), hl.z());
+  printf("| HR -| %+8.04f| %+8.04f| %+8.04f|\n",
+      hr.x(), hr.y(), hr.z());
   printf("-------------------------------------------------------------------\n");
 }
 
@@ -679,6 +916,16 @@ void __print_command(const Eigen::VectorXd* leg_cmds_) {
   printf("---------------------------------\n");
 }
 
+Eigen::Vector2d __incenter(
+    const Eigen::Vector2d& A, const Eigen::Vector2d& B, const Eigen::Vector2d& C) {
+  double a = (B - C).norm();
+  double b = (A - C).norm();
+  double c = (A - B).norm();
+  double sum = a + b + c;
+  return Eigen::Vector2d(
+      (a*A.x() + b*B.x() + c*C.x())/sum,(a*A.y() + b*B.y() + c*C.y())/sum);
+}
+
 /*!
  * @brief This methods calculate the next target position through the start
  *        point _p0, end point _p1, the current/total count(t/T), the brachyaxis
@@ -709,6 +956,7 @@ void __cross_point(
     const Eigen::Vector2d& p0_0, const Eigen::Vector2d& p0_1,
     const Eigen::Vector2d& p1_0, const Eigen::Vector2d& p1_1,
     Eigen::Vector2d& res) {
+
   Eigen::Matrix2d cof_mat;
   Eigen::Vector2d beta;
   if (p0_0.x() != p0_1.x()) {
