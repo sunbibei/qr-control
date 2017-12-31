@@ -189,6 +189,7 @@ void Trajectory<_DataType, _Dim_X>::reset(const CoeffMat& _new_coeff) {
 template<typename _DataType, int _Dim_X>
 typename Trajectory<_DataType, _Dim_X>::StateVec
 Trajectory<_DataType, _Dim_X>::sample(_DataType _t) {
+  assert(0 != coeffs_.cols());
   return coeffs_ * __get_state_vec<_DataType>(_t, dim_exp_);
 }
 
