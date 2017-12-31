@@ -13,6 +13,7 @@
 
 #include <Eigen/Dense>
 
+#define DIS_JNT_LIMIT
 // #define PUB_ROS_TOPIC
 #ifdef PUB_ROS_TOPIC
 #include <ros/ros.h>
@@ -118,7 +119,7 @@ protected:
   ///! The commands of legs.
   class LegTarget*      leg_cmds_[LegType::N_LEGS];
   ///! Variables about gait control
-  class WalkParam*      coeff_;
+  class WalkParam*      params_;
 
   ///! The time control
   TimeControl*     timer_;
