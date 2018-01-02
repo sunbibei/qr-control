@@ -90,6 +90,8 @@ struct WalkParam {
   double STANCE_HEIGHT;
   ///! The height value when swing leg.
   double SWING_HEIGHT;
+  ///! The orientation of forward walk.
+  double FORWARD_ALPHA;
 
   ///! The time for moving COG(in ms)
   int64_t   COG_TIME;
@@ -99,12 +101,14 @@ struct WalkParam {
   WalkParam(const MiiString& _tag)
     : THRES_COG(6.5),    FOOT_STEP(10),
       STANCE_HEIGHT(46), SWING_HEIGHT(5),
+      FORWARD_ALPHA(0),
       COG_TIME(2000),    SWING_TIME(2000) {
     auto cfg = MiiCfgReader::instance();
     cfg->get_value(_tag, "cog_threshold", THRES_COG);
     cfg->get_value(_tag, "step",         FOOT_STEP);
     cfg->get_value(_tag, "stance_height",STANCE_HEIGHT);
     cfg->get_value(_tag, "swing_height", SWING_HEIGHT);
+    cfg->get_value(_tag, "forward_orientation", FORWARD_ALPHA);
 
     cfg->get_value(_tag, "cog_time",     COG_TIME);
     cfg->get_value(_tag, "swing_time",   SWING_TIME);
@@ -209,6 +213,8 @@ bool Walk::starting() {
   state_machine_->registerStateCallback(
       WalkState::WK_SWING,     &Walk::swing_leg, this);
   state_machine_->registerStateCallback(
+      WalkState::WK_STOP,      &Walk::stance, this);
+  state_machine_->registerStateCallback(
       WalkState::WK_HANG,      &Walk::hang_walk, this);
 
   current_state_ = WalkState::WK_INIT_POSE;
@@ -227,13 +233,19 @@ bool Walk::starting() {
 }
 
 void Walk::stopping() {
-  delete eef_traj_;
-  eef_traj_ = nullptr;
-
   for (auto& t : cog2eef_traj_) {
     delete t;
     t = nullptr;
   }
+
+  delete eef_traj_;
+  eef_traj_ = nullptr;
+
+  delete timer_;
+  timer_ = nullptr;
+
+  delete state_machine_;
+  state_machine_ = nullptr;
 
   LOG_INFO << "The walk gait has STOPPED!";
 }
@@ -438,10 +450,16 @@ bool Walk::end_swing_leg() {
             || (diff < 0.3) || (timer_->span() > 2*params_->SWING_TIME));
 }
 
+// TODO
+void Walk::stance() {
+  ;
+}
+
 void Walk::prog_eef_traj() {
   Eigen::Vector3d _last_fpt = leg_ifaces_[swing_leg_]->eef();
   Eigen::Vector3d _next_fpt = _last_fpt;
   _next_fpt.x() += params_->FOOT_STEP;
+  _next_fpt.y()  = _next_fpt.x() * tan(params_->FORWARD_ALPHA);
 
   Eigen::Matrix3d A;
   A << 1,   0,    0,
@@ -451,7 +469,7 @@ void Walk::prog_eef_traj() {
   Eigen::Matrix3d b;
   b.row(0) = _last_fpt;
   b.row(1) = _next_fpt;
-  b.row(2) << (_last_fpt.x()/2 + _next_fpt.x()/2), _last_fpt.y(), (_last_fpt.z() + params_->SWING_HEIGHT);
+  b.row(2) << (_last_fpt.x()/2 + _next_fpt.x()/2), (_last_fpt.y()/2 + _next_fpt.y()/2), (_last_fpt.z() + params_->SWING_HEIGHT);
 
   Eigen::Matrix3d c;
   if (0 == A.determinant()) {
