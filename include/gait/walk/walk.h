@@ -33,6 +33,7 @@ enum WalkState {
   WK_INIT_POSE = 0,
   WK_MOVE_COG,
   WK_SWING,
+  WK_STOP,
   WK_HANG,
   N_WK_STATE,
 };
@@ -65,7 +66,7 @@ protected:
   ///! The state machine corresponds with CreepState for creep
   StateMachine<WalkState>*   state_machine_;
 
-///! These methods are the callback method for WalkState.
+///! These methods are the callback methods for WalkState.
 private:
   ///! The callback for WK_INIT_POSE
   void pose_init();
@@ -73,6 +74,8 @@ private:
   void move_cog();
   ///! The callback for WK_SWING
   void swing_leg();
+  ///! The callback for WK_STOP
+  void stance();
   ///! The callback for WK_XXX
   void walk();
   ///! The debug callback for WK_HANG
