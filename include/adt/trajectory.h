@@ -189,6 +189,7 @@ void Trajectory<_DataType, _Dim_X>::reset(const CoeffMat& _new_coeff) {
 template<typename _DataType, int _Dim_X>
 typename Trajectory<_DataType, _Dim_X>::StateVec
 Trajectory<_DataType, _Dim_X>::sample(_DataType _t) {
+  assert(0 != coeffs_.cols());
   return coeffs_ * __get_state_vec<_DataType>(_t, dim_exp_);
 }
 
@@ -365,7 +366,7 @@ __get_int_vec(const _DataType& _t, const Eigen::Index& _exp) {
 
 
 #define TRAJ_MAKE_TYPEDEFS(Type, TypeSuffix, Size, SizeSuffix)   \
-typedef Trajectory<Type, Size> Trajectory##SizeSuffix##TypeSuffix;
+using Trajectory##SizeSuffix##TypeSuffix = Trajectory<Type, Size>;
 
 #define TRAJ_MAKE_TYPEDEFS_ALL_SIZES(Type, TypeSuffix) \
 TRAJ_MAKE_TYPEDEFS(Type, TypeSuffix, 1, 1) \

@@ -19,46 +19,44 @@ QrBody::~QrBody() {
 }
 
 ///! The pose of robot against the world frame
-void QrBody::pose(Eigen::Vector3d&, Eigen::Quaterniond&) {
-  ;
-}
-
-///! The translation of robot against the world frame
-void QrBody::translation(EV3&) /*= 0*/ {
+void QrBody::pose(Eigen::Vector3d&, Eigen::Quaterniond&)  {
   LOG_ERROR << "Call the 'translation' which has does not complemented.";
 }
 
+///! The translation of robot against the world frame
+Eigen::Vector3d QrBody::translation() {
+  LOG_ERROR << "Call the 'translation' which has does not complemented.";
+  return Eigen::Vector3d(0.0, 0.0, 0.0);
+}
+
 ///! The rotation of robot against the world frame
-void QrBody::rotation(Eigen::Quaterniond&) /*= 0*/ {
-  LOG_ERROR << "Call the 'rotation' which has does not complemented.";
+Eigen::Quaterniond QrBody::rotation() {
+  LOG_ERROR << "Call the 'translation' which has does not complemented.";
+  return Eigen::Quaterniond(0.0, 0.0, 0.0, 0.0);
 }
 
 ///! The velocity of robot against the world frame
-void QrBody::velocity(EV3& v)  /*= 0*/ {
-  LOG_ERROR << "Call the 'velocity' which has does not complemented.";
+Eigen::Vector3d QrBody::velocity() {
+  LOG_ERROR << "Call the 'translation' which has does not complemented.";
+  return Eigen::Vector3d(0.0, 0.0, 0.0);
 }
 
 ///! The centre of gravity of robot
-void QrBody::cog(EV3&)         /*= 0*/ {
-  LOG_ERROR << "Call the 'cog' which has does not complemented.";
+Eigen::Vector3d QrBody::cog() {
+  // LOG_ERROR << "Call the 'translation' which has does not complemented.";
+  return Eigen::Vector3d(0.0, 0.0, 0.0);
 }
 
-void QrBody::leg_base(LegType leg, Eigen::Vector3d& _xyz) {
+///! The translation of LegType shoulder(leg_base frame) of robot against the world frame.
+Eigen::Vector3d QrBody::leg_base(LegType leg) {
   switch (leg) {
-  case LegType::FL:
-    _xyz << body_length(), body_width(), 0;
-    break;
-  case LegType::FR:
-    _xyz << body_length(), -body_width(), 0;
-    break;
-  case LegType::HL:
-    _xyz << -body_length(), body_width(), 0;
-    break;
-  case LegType::HR:
-    _xyz << -body_length(), -body_width(), 0;
-    break;
+  case LegType::FL: return Eigen::Vector3d( body_length(),  body_width(), 0);
+  case LegType::FR: return Eigen::Vector3d( body_length(), -body_width(), 0);
+  case LegType::HL: return Eigen::Vector3d(-body_length(),  body_width(), 0);
+  case LegType::HR: return Eigen::Vector3d(-body_length(), -body_width(), 0);
   default:
     LOG_ERROR << "ERROR LegType";
+    return Eigen::Vector3d(0, 0, 0);
     break;
   }
 }

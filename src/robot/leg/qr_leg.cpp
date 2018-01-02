@@ -60,7 +60,7 @@ QrLeg::~QrLeg()  {
   topology_ = nullptr;
 }
 
-void QrLeg::followJntTrajectory(JntType jnt, const Trajectory1d _traj)  {
+void QrLeg::followJntTrajectory(JntType jnt, const Trajectory1d& _traj)  {
   const auto& _jnt_poss = joint_position_const_ref();
   const auto& _jnt_vels = joint_velocity_const_ref();
   // const auto& _jnt_cmds = joint_command_ref();
@@ -76,11 +76,11 @@ void QrLeg::followJntTrajectory(JntType jnt, const Trajectory1d _traj)  {
   }
 }
 
-void QrLeg::followJntTrajectory(const Trajectory3d) {
+void QrLeg::followJntTrajectory(const Trajectory3d&) {
   LOG_ERROR << "Call the 'followJntTrajectory' which has does not complemented.";
 }
 
-void QrLeg::followEefTrajectory(const Trajectory3d) 
+void QrLeg::followEefTrajectory(const Trajectory3d&)
 {
   LOG_ERROR << "Call the 'followJntTrajectory' which has does not complemented.";
 }

@@ -20,17 +20,17 @@ public:
 ///! inherit from MathBody
 public:
   ///! The pose of robot against the world frame
-  virtual void pose(Eigen::Vector3d&, Eigen::Quaterniond&) /*= 0*/;
+  virtual void pose(Eigen::Vector3d&, Eigen::Quaterniond&) override/*= 0*/;
   ///! The translation of robot against the world frame
-  virtual void translation(EV3&) override /*= 0*/;
+  virtual Eigen::Vector3d    translation() override /*= 0*/;
   ///! The rotation of robot against the world frame
-  virtual void rotation(Eigen::Quaterniond&) override /*= 0*/;
+  virtual Eigen::Quaterniond rotation()    override /*= 0*/;
   ///! The velocity of robot against the world frame
-  virtual void velocity(EV3& v)  override /*= 0*/;
+  virtual Eigen::Vector3d    velocity()    override /*= 0*/;
   ///! The centre of gravity of robot
-  virtual void cog(EV3&)         override /*= 0*/;
-
-  virtual void leg_base(LegType, Eigen::Vector3d&) override;
+  virtual Eigen::Vector3d    cog()         override /*= 0*/;
+  ///! The translation of LegType shoulder(leg_base frame) of robot against the world frame.
+  virtual Eigen::Vector3d    leg_base(LegType) override;  /*= 0*/;
 };
 
 } /* namespace qr_control */
