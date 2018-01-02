@@ -111,7 +111,7 @@ private:
    *        The order as follow:
    *        HL -> FL -> HR -> FR
    *
-   *        **NOTE**: This method ONLY be called after the moving COG.
+   *        **NOTE**: This method ONLY be called before the swing leg.
    */
   LegType next_leg(const LegType);
 
@@ -119,7 +119,7 @@ private:
    * @brief It get a reference of next COG coordination when given the current
    *        swing leg.
    */
-  Eigen::Vector2d prog_next_cog(LegType);
+  Eigen::Vector2d prog_next_cog();
 protected:
   ///! The interface for body
   class QrBody*         body_iface_;

@@ -68,10 +68,9 @@ Eigen::Vector2d __incenter(const Eigen::Vector2d&, const Eigen::Vector2d&, const
 void __cycloid_position(
       const Eigen::Vector3d&, const Eigen::Vector3d&, int, int, int, Eigen::Vector3d&);
 
-void __cross_point(
+Eigen::Vector2d __cross_point(
     const Eigen::Vector2d& p0_0, const Eigen::Vector2d& p0_1,
-    const Eigen::Vector2d& p1_0, const Eigen::Vector2d& p1_1,
-    Eigen::Vector2d&);
+    const Eigen::Vector2d& p1_0, const Eigen::Vector2d& p1_1);
 
 double __inscribed_circle_radius(
     const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
@@ -275,7 +274,6 @@ void Walk::checkState() {
       prog_cog_traj();
 
       PRESS_THEN_GO
-      swing_leg_ = next_leg(swing_leg_);
       timer_->start();
     }
 
@@ -298,6 +296,7 @@ void Walk::checkState() {
   {
     ///! the begin of WK_SWING
     if (!timer_->running()) {
+      swing_leg_ = next_leg(swing_leg_);
       // prog_next_fpt();
       prog_eef_traj();
       // sum_interval_ = 0;
@@ -314,17 +313,17 @@ void Walk::checkState() {
     __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
     PRESS_THEN_GO
 
-    current_state_ = WalkState::WK_MOVE_COG;
-    break;
+//    current_state_ = WalkState::WK_MOVE_COG;
+//    break;
     ///! programe the next swing leg
     // swing_leg_ = next_leg(swing_leg_);
     ///! Every twice swing leg then adjusting COG.
-//    if ((LegType::FL != swing_leg_) && (LegType::FR != swing_leg_)) {
-//      current_state_ = WalkState::WK_MOVE_COG;
-//    } else {
-//      // prog_next_fpt();
-//      prog_eef_traj();
-//    }
+    if ((LegType::FL == swing_leg_) || (LegType::FR == swing_leg_)) {
+      current_state_ = WalkState::WK_MOVE_COG;
+    }/* else {
+      // prog_next_fpt();
+      prog_eef_traj();
+    }*/
     break;
   }
   case WalkState::WK_HANG:
@@ -469,7 +468,7 @@ void Walk::prog_eef_traj() {
 void Walk::prog_cog_traj() {
   Eigen::Vector3d _p0(0.0, 0.0, -params_->STANCE_HEIGHT);
   Eigen::Vector3d _p1(0.0, 0.0, -params_->STANCE_HEIGHT);
-  Eigen::Vector2d _tmp_next_cog = prog_next_cog(swing_leg_);
+  Eigen::Vector2d _tmp_next_cog = prog_next_cog();
 
   FOR_EACH_LEG(l) {
     _p0 = leg_ifaces_[l]->eef();
@@ -487,12 +486,28 @@ void Walk::prog_cog_traj() {
   }
 }
 
-Eigen::Vector2d Walk::prog_next_cog(LegType) {
+Eigen::Vector2d Walk::prog_next_cog() {
   Eigen::Vector2d _next_cog_proj(0.0, 0.0), _p[3];
-  Eigen::Vector2d _last_cog_proj(0.0, 0.0);
+  Eigen::Vector2d _last_cog_proj(0.0, 0.0), _lwp[LegType::N_LEGS];
   _last_cog_proj = body_iface_->cog().head(2);
 
+  FOR_EACH_LEG(l) {
+    _lwp[l] = (leg_ifaces_[l]->eef() + body_iface_->leg_base(l)).head(2);
+  }
+  _p[0] = __cross_point(_lwp[LegType::FL], _lwp[LegType::HR],
+      _lwp[LegType::FR], _lwp[LegType::HL]);
+
   LegType _next_leg = next_leg(swing_leg_);
+  // _p[0] = body_iface_->cog().head(2);
+  if ((LegType::FL == _next_leg) || (LegType::HL == _next_leg)) {
+    _p[1] = (leg_ifaces_[LegType::FR]->eef() + body_iface_->leg_base(LegType::FR)).head(2);
+    _p[2] = (leg_ifaces_[LegType::HR]->eef() + body_iface_->leg_base(LegType::HR)).head(2);
+  } else {
+    _p[1] = (leg_ifaces_[LegType::FL]->eef() + body_iface_->leg_base(LegType::FL)).head(2);
+    _p[2] = (leg_ifaces_[LegType::HL]->eef() + body_iface_->leg_base(LegType::HL)).head(2);
+  }
+  _next_cog_proj = __incenter(_p[0], _p[1], _p[2]);
+  return _next_cog_proj;
 
   int idx = 0;
   FOR_EACH_LEG(l) {
@@ -997,13 +1012,13 @@ void __cycloid_position(
     _p(2) = 2.0 * b * ((float)(T-t)/(float)T - 1.0/4.0/M_PI*sin(4.0*M_PI*(T-t)/T));
 }
 
-void __cross_point(
+Eigen::Vector2d __cross_point(
     const Eigen::Vector2d& p0_0, const Eigen::Vector2d& p0_1,
-    const Eigen::Vector2d& p1_0, const Eigen::Vector2d& p1_1,
-    Eigen::Vector2d& res) {
-
+    const Eigen::Vector2d& p1_0, const Eigen::Vector2d& p1_1) {
+  Eigen::Vector2d res;
   Eigen::Matrix2d cof_mat;
   Eigen::Vector2d beta;
+
   if (p0_0.x() != p0_1.x()) {
     cof_mat(0, 0) = -(p0_1.y() - p0_0.y()) / (p0_1.x() - p0_0.x());
     cof_mat(0, 1) = 1;
@@ -1028,6 +1043,8 @@ void __cross_point(
   } else {
     res = cof_mat.partialPivLu().solve(beta);
   }
+
+  return res;
 }
 
 double __inscribed_circle_radius(
