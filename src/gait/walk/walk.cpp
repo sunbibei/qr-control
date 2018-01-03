@@ -401,7 +401,7 @@ void Walk::post_tick() {
     cmd_pub_->msg_.data.clear();
     for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
       const auto& cmds = jnts_pos_cmd_[l];
-      for (const auto& j : {JntType::YAW, JntType::HIP, JntType::KNEE}) {
+      for (const auto& j : {JntType::KNEE, JntType::HIP, JntType::YAW}) {
         cmd_pub_->msg_.data.push_back(cmds(j));
       }
     }
