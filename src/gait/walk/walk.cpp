@@ -473,6 +473,12 @@ void Walk::swing_leg() {
 bool Walk::end_swing_leg() {
 
   auto diff = (eef_traj_->sample(1) - leg_ifaces_[swing_leg_]->eef()).norm();
+  if (diff < 1.0) {
+    return ((LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state())
+        || (diff < 0.3));
+  } else {
+    return false;
+  }
   return ((LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state())
             || (diff < 0.3) || (timer_->span() > 2*params_->SWING_TIME));
 }
