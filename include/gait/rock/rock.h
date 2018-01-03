@@ -33,7 +33,7 @@ protected:
 	virtual void stopping() override;
 
 	virtual void checkState() override;
-	virtual S
+	// virtual S
 	virtual void prev_tick() override;
 	virtual void post_tick() override;
 

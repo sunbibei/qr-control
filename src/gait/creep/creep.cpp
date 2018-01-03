@@ -34,7 +34,7 @@ struct __PrivateParam {
 
 Creep::Creep(const MiiString& _n)
   : GaitBase(_n), current_state_(CreepState::INVALID_CREEP_STATE),
-    state_machine_(nullptr), params_(nullptr),
+    params_(nullptr),
     loop_count_(0), leg_order_(LegType::UNKNOWN_LEG) {
   for (auto& l : leg_ifaces_)
     l = nullptr;
@@ -42,23 +42,6 @@ Creep::Creep(const MiiString& _n)
 
 bool Creep::init() {
   if (!GaitBase::init()) return false;
-  // auto cfg = MiiCfgReader::instance();
-  params_        = new __PrivateParam(getLabel());
-
-  state_machine_ = new StateMachine<CreepState>(current_state_);
-  state_machine_->registerStateCallback(
-      CreepState::STATE_INIT_POS, &Creep::init_pose, this);
-  state_machine_->registerStateCallback(
-      CreepState::STATE_IMU,      &Creep::cali_imu,  this);
-  state_machine_->registerStateCallback(
-      CreepState::STATE_STANCE,   &Creep::stance,    this);
-  state_machine_->registerStateCallback(
-      CreepState::STATE_HEIGHT,   &Creep::height,    this, &current_state_);
-  state_machine_->registerStateCallback(
-      CreepState::STATE_SWING,    &Creep::swing,     this, &loop_count_);
-  state_machine_->registerStateCallback(
-      CreepState::STATE_HEIGHT2,  &Creep::height,    this, nullptr);
-  current_state_ = CreepState::STATE_INIT_POS;
 
   int count      = 0;
   LegType leg    = LegType::UNKNOWN_LEG;
@@ -85,6 +68,37 @@ bool Creep::init() {
   }
 
   return true;
+}
+
+bool Creep::starting() {
+  params_        = new __PrivateParam(getLabel());
+  state_machine_ = new StateMachine<CreepState>(current_state_);
+  auto _sm       = (StateMachine<CreepState>*)state_machine_;
+  _sm->registerStateCallback(
+      CreepState::STATE_INIT_POS, &Creep::init_pose, this);
+  _sm->registerStateCallback(
+      CreepState::STATE_IMU,      &Creep::cali_imu,  this);
+  _sm->registerStateCallback(
+      CreepState::STATE_STANCE,   &Creep::stance,    this);
+  _sm->registerStateCallback(
+      CreepState::STATE_HEIGHT,   &Creep::height,    this, &current_state_);
+  _sm->registerStateCallback(
+      CreepState::STATE_SWING,    &Creep::swing,     this, &loop_count_);
+  _sm->registerStateCallback(
+      CreepState::STATE_HEIGHT2,  &Creep::height,    this, nullptr);
+  current_state_ = CreepState::STATE_INIT_POS;
+
+  return true;
+}
+
+void Creep::stopping() {
+  delete params_;
+  params_ = nullptr;
+
+  delete state_machine_;
+  state_machine_ = nullptr;
+
+  current_state_ = CreepState::INVALID_CREEP_STATE;
 }
 
 Creep::~Creep() {
@@ -167,9 +181,6 @@ void Creep::checkState() {
   ++loop_count_;
 }
 
-StateMachineBase* Creep::state_machine() {
-  return state_machine_;
-}
 
 void Creep::init_pose() {
   LOG_EVERY_N(WARNING, 100) << "I'm " << __FILE__ << " " << __LINE__

@@ -90,7 +90,7 @@ protected:
    *        by sub-class.This method should be a abstract method, but
    *        this class is needs to auto-instance, so cancel '=0'.
    */
-  virtual StateMachineBase* state_machine() = 0;
+  virtual StateMachineBase* state_machine() { return state_machine_; };
 
   /*!
    * @brief This method will be called when the gait is activated and
@@ -126,7 +126,8 @@ protected:
   // void update();
 
 protected:
-  MiiString    gait_name_;
+  MiiString           gait_name_;
+  StateMachineBase*   state_machine_;
 };
 
 

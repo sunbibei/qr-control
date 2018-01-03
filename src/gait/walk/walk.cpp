@@ -33,9 +33,17 @@ namespace qr_control {
     leg_cmds_[LegType::HL]->target, \
     leg_cmds_[LegType::HR]->target
 
+#define PRINT_PARAM_CURRENT_EEF \
+  leg_ifaces_[LegType::FL]->eef(), \
+  leg_ifaces_[LegType::FR]->eef(), \
+  leg_ifaces_[LegType::HL]->eef(), \
+  leg_ifaces_[LegType::HR]->eef()
+
 #define PRINT_CURRENT_POSS   __print_positions(PRINT_PARAM_CURRENT_POS);
 #define PRINT_POSS_VS_TARGET __print_positions(PRINT_PARAM_CURRENT_POS, PRINT_PARAM_TARGET_POS);
+#define PRINT_CURRENT_EEF    __print_positions(PRINT_PARAM_CURRENT_EEF);
 #define PRINT_COMMAND        __print_command(leg_cmds_);
+
 #define PRESS_THEN_GO        {LOG_WARNING << "Press any key to continue."; getchar();}
 
 ///! These are the inline functions forward declare.
@@ -81,6 +89,9 @@ Eigen::Vector2d __inner_heart(
 Eigen::Vector2d __line_section(
     const Eigen::Vector2d& A, const Eigen::Vector2d& B, double ratio);
 
+LegType __same_side(LegType _c);
+//LegType __ipsilateral(LegType _c);
+
 struct WalkParam {
   ///! The threshold for cog
   double THRES_COG;
@@ -117,7 +128,7 @@ struct WalkParam {
 
 Walk::Walk()
   : current_state_(WalkState::UNKNOWN_WK_STATE),
-    state_machine_(nullptr), body_iface_(nullptr),
+    body_iface_(nullptr),
     params_(nullptr), timer_(nullptr), eef_traj_(nullptr),
     swing_leg_(LegType::UNKNOWN_LEG), post_tick_interval_(50)
 {
@@ -206,16 +217,13 @@ bool Walk::init() {
 
 bool Walk::starting() {
   state_machine_ = new StateMachine<WalkState>(current_state_);
-  state_machine_->registerStateCallback(
-      WalkState::WK_INIT_POSE, &Walk::pose_init, this);
-  state_machine_->registerStateCallback(
-      WalkState::WK_MOVE_COG,  &Walk::move_cog,  this);
-  state_machine_->registerStateCallback(
-      WalkState::WK_SWING,     &Walk::swing_leg, this);
-  state_machine_->registerStateCallback(
-      WalkState::WK_STOP,      &Walk::stance, this);
-  state_machine_->registerStateCallback(
-      WalkState::WK_HANG,      &Walk::hang_walk, this);
+  auto _sm       = (StateMachine<WalkState>*)state_machine_;
+  _sm->registerStateCallback(WalkState::WK_INIT_POSE, &Walk::pose_init, this);
+  _sm->registerStateCallback(WalkState::WK_MOVE_COG,  &Walk::move_cog,  this);
+  _sm->registerStateCallback(WalkState::WK_SWING,     &Walk::swing_leg, this);
+  _sm->registerStateCallback(WalkState::WK_STOP,      &Walk::stance,    this);
+  _sm->registerStateCallback(WalkState::WK_SPIRALLING,&Walk::spiralling,this);
+  _sm->registerStateCallback(WalkState::WK_HANG,      &Walk::hang_walk, this);
 
   current_state_ = WalkState::WK_INIT_POSE;
 #ifdef PUB_ROS_TOPIC
@@ -327,7 +335,7 @@ void Walk::checkState() {
 
 //    current_state_ = WalkState::WK_MOVE_COG;
 //    break;
-    ///! programe the next swing leg
+    ///! program the next swing leg
     // swing_leg_ = next_leg(swing_leg_);
     ///! Every twice swing leg then adjusting COG.
     if ((LegType::FL == swing_leg_) || (LegType::FR == swing_leg_)) {
@@ -338,6 +346,25 @@ void Walk::checkState() {
     }*/
     break;
   }
+  case WalkState::WK_STOP:
+  {
+    ///! the begin of WK_SWING
+    if (!timer_->running()) {
+
+
+      timer_->start();
+    }
+
+    ///! the end of WK_SWING
+    timer_->stop(&_s_tmp_span);
+    LOG_WARNING << "*******----END STOP("
+        << _s_tmp_span << "ms)----*******";
+
+    PRINT_CURRENT_EEF
+    PRESS_THEN_GO
+    break;
+  }
+  case WalkState::WK_SPIRALLING:
   case WalkState::WK_HANG:
   default:
     LOG_ERROR << "What fucking walk state!";
@@ -452,14 +479,42 @@ bool Walk::end_swing_leg() {
 
 // TODO
 void Walk::stance() {
+  FOR_EACH_LEG(l) {
+    ;
+  }
+}
+
+bool Walk::end_stance() {
+  Eigen::Vector3d _tmp(0.0, 0.0, params_->STANCE_HEIGHT);
+  // ;
+  FOR_EACH_LEG(l) {
+    auto diff  = (cog2eef_traj_[l]->sample(1) - leg_ifaces_[l]->eef()).norm();
+    if (diff > 0.1) return false;
+  }
+  return true;
+}
+
+// TODO
+void Walk::spiralling() {
   ;
 }
 
 void Walk::prog_eef_traj() {
   Eigen::Vector3d _last_fpt = leg_ifaces_[swing_leg_]->eef();
   Eigen::Vector3d _next_fpt = _last_fpt;
-  _next_fpt.x() += params_->FOOT_STEP;
-  _next_fpt.y()  = _next_fpt.x() * tan(params_->FORWARD_ALPHA);
+  Eigen::Vector3d _other_fpt= _last_fpt;
+
+  auto _other_leg = __same_side(swing_leg_);
+  if (LegType::UNKNOWN_LEG != _other_leg)
+    _other_fpt = leg_ifaces_[_other_leg]->eef();
+
+  if (std::abs(_other_fpt.x() - _last_fpt.x()) > 0.5*params_->FOOT_STEP) {
+    _next_fpt.x() = _other_fpt.x() + params_->FOOT_STEP;
+    _next_fpt.y() = _other_fpt.y();
+  } else {
+    _next_fpt.x() += params_->FOOT_STEP;
+    _next_fpt.y()  = _last_fpt.y() + std::abs(_next_fpt.x() - _last_fpt.x()) * tan(params_->FORWARD_ALPHA);
+  }
 
   Eigen::Matrix3d A;
   A << 1,   0,    0,
@@ -538,7 +593,7 @@ Eigen::Vector2d Walk::prog_next_cog() {
 }
 
 
-StateMachineBase* Walk::state_machine() { return state_machine_; }
+// StateMachineBase* Walk::state_machine() { return state_machine_; }
 
 // TODO
 void Walk::walk() { ; }
@@ -1095,6 +1150,16 @@ Eigen::Vector2d __line_section(
   result.x() = B.x() - ratio * (B.x() - A.x());
   result.y() = B.y() - ratio * (B.y() - A.y());
   return result;
+}
+
+LegType __same_side(LegType _c) {
+  switch (_c) {
+  case LegType::FL: return LegType::FR;
+  case LegType::FR: return LegType::FL;
+  case LegType::HL: return LegType::HR;
+  case LegType::HR: return LegType::HL;
+  default: return LegType::UNKNOWN_LEG;
+  }
 }
 
 } /* namespace qr_control */

@@ -33,15 +33,13 @@ public:
 
 ///! These methods are inherited from super class.
 public:
-  virtual void              checkState()    override;
-  virtual StateMachineBase* state_machine() override;
-  CreepState                currentState()  const;
+  virtual void checkState() override;
+  virtual bool starting()   override;
+  virtual void stopping()   override;
 
 protected:
   ///! The state enumeration for creep.
   CreepState                current_state_;
-  ///! The state machine corresponds with CreepState for creep
-  StateMachine<CreepState>* state_machine_;
 
 private:
   ///! Example

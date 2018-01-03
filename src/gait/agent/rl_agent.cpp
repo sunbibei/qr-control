@@ -16,7 +16,6 @@ RLAgent::RLAgent(const MiiString& _l)
   : GaitBase(_l), rl_agent::RobotPlugin2(_l),
     gain_(1.0), is_send_(false),
     /*current_state_(AGENT_STATE::UNKONWN_RL_STATE),*/
-    state_machine_(nullptr),
     trial_leg_ifaces_(nullptr) {
   ;
 }
@@ -25,17 +24,6 @@ bool RLAgent::init() {
   if (!GaitBase::init()) return false;
 
   tag_ = getLabel();
-  rl_agent::RobotPlugin2::initialize();
-
-  state_machine_ = new StateMachine<AGENT_STATE>(current_state_);
-  state_machine_->registerStateCallback(
-      AGENT_STATE::RL_STATE_RESET,   &RLAgent::reset,   this);
-  state_machine_->registerStateCallback(
-      AGENT_STATE::RL_STATE_TRIAL,   &RLAgent::trial,   this);
-  state_machine_->registerStateCallback(
-      AGENT_STATE::RL_STATE_NOTHING, &RLAgent::nothing, this);
-
-  current_state_ = AGENT_STATE::RL_STATE_NOTHING;
 
   auto cfg       = MiiCfgReader::instance();
   cfg->get_value(getLabel(), "gain", gain_);
@@ -53,6 +41,29 @@ bool RLAgent::init() {
   }
 
   return true;
+}
+
+bool RLAgent::starting() {
+  rl_agent::RobotPlugin2::initialize();
+
+  state_machine_ = new StateMachine<AGENT_STATE>(current_state_);
+  state_machine_->registerStateCallback(
+      AGENT_STATE::RL_STATE_RESET,   &RLAgent::reset,   this);
+  state_machine_->registerStateCallback(
+      AGENT_STATE::RL_STATE_TRIAL,   &RLAgent::trial,   this);
+  state_machine_->registerStateCallback(
+      AGENT_STATE::RL_STATE_NOTHING, &RLAgent::nothing, this);
+
+  current_state_ = AGENT_STATE::RL_STATE_NOTHING;
+
+  return true;
+}
+
+void RLAgent::stopping() {
+  delete state_machine_;
+  state_machine_ = nullptr;
+
+  current_state_ = AGENT_STATE::UNKONWN_RL_STATE;
 }
 
 RLAgent::~RLAgent() {
@@ -286,10 +297,6 @@ void RLAgent::trialSubCb(const rl_msgs::TrialCommand::ConstPtr& msg) {
 
   is_report_waiting_ = true;
   current_state_ = AGENT_STATE::RL_STATE_TRIAL;
-}
-
-StateMachineBase* RLAgent::state_machine() {
-  return state_machine_;
 }
 
 } /* namespace qr_control */

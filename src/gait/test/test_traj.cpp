@@ -23,7 +23,7 @@ namespace qr_control {
 
 TestTraj::TestTraj(const MiiString& _n)
   : GaitBase(_n), current_state_(TestTrajState::INVALID_TEST_STATE),
-    state_machine_(nullptr), last_choice_(TestTrajState::STATE_INIT),
+    last_choice_(TestTrajState::STATE_INIT),
     loop_count_(0), leg_order_(LegType::UNKNOWN_LEG) {
   for (auto& l : leg_ifaces_)
     l = nullptr;
@@ -31,21 +31,6 @@ TestTraj::TestTraj(const MiiString& _n)
 
 bool TestTraj::init() {
   if (!GaitBase::init()) return false;
-
-  state_machine_ = new StateMachine<TestTrajState>(current_state_);
-  state_machine_->registerStateCallback(
-      TestTrajState::STATE_INIT,   &TestTraj::initialize, this);
-  state_machine_->registerStateCallback(
-      TestTrajState::STATE_READ_STATE, &TestTraj::print,  this);
-  state_machine_->registerStateCallback(
-      TestTrajState::STATE_COMMAND, &TestTraj::command,  this);
-  state_machine_->registerStateCallback(
-      TestTrajState::STATE_READ_CMD, &TestTraj::read_cmd,  this);
-  state_machine_->registerStateCallback(
-      TestTrajState::STATE_TRAJ_JNT, &TestTraj::traj,  this);
-
-
-  current_state_ = TestTrajState::STATE_INIT;
 
   int count      = 0;
   LegType leg    = LegType::UNKNOWN_LEG;
@@ -74,6 +59,33 @@ bool TestTraj::init() {
   return true;
 }
 
+bool TestTraj::starting() {
+  state_machine_ = new StateMachine<TestTrajState>(current_state_);
+  auto _sm       = (StateMachine<TestTrajState>*)state_machine_;
+  _sm->registerStateCallback(
+      TestTrajState::STATE_INIT,   &TestTraj::initialize, this);
+  _sm->registerStateCallback(
+      TestTrajState::STATE_READ_STATE, &TestTraj::print,  this);
+  _sm->registerStateCallback(
+      TestTrajState::STATE_COMMAND, &TestTraj::command,  this);
+  _sm->registerStateCallback(
+      TestTrajState::STATE_READ_CMD, &TestTraj::read_cmd,  this);
+  _sm->registerStateCallback(
+      TestTrajState::STATE_TRAJ_JNT, &TestTraj::traj,  this);
+
+
+  current_state_ = TestTrajState::STATE_INIT;
+  return true;
+}
+
+void TestTraj::stopping() {
+  delete state_machine_;
+  state_machine_ = nullptr;
+
+  current_state_ = TestTrajState::INVALID_TEST_STATE;
+}
+
+
 TestTraj::~TestTraj() {
   if (state_machine_) {
     delete state_machine_;
@@ -93,9 +105,9 @@ void TestTraj::checkState() {
   ++loop_count_;*/
 }
 
-StateMachineBase* TestTraj::state_machine() {
-  return state_machine_;
-}
+//StateMachineBase* TestTraj::state_machine() {
+//  return state_machine_;
+//}
 
 LegType __get_leg_type(const MiiString& _val) {
   if (0 == _val.compare("fl")) {

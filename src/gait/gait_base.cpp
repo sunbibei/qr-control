@@ -16,7 +16,7 @@ StateMachineBase::StateMachineBase()  { }
 StateMachineBase::~StateMachineBase() { }
 
 GaitBase::GaitBase(const MiiString& _l)
-  : Label(_l) {
+  : Label(_l), state_machine_(nullptr) {
   // Register gait class pointer into manager.
   GaitManager::instance()->add(this);
 }

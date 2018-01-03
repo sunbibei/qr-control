@@ -34,6 +34,7 @@ enum WalkState {
   WK_MOVE_COG,
   WK_SWING,
   WK_STOP,
+  WK_SPIRALLING,
   WK_HANG,
   N_WK_STATE,
 };
@@ -49,7 +50,7 @@ public:
 public:
   ///! The flow of state convert
   virtual void              checkState()    override;
-  virtual StateMachineBase* state_machine() override;
+  // virtual StateMachineBase* state_machine() override;
 
   ///! call it before the state callback
   // virtual void              prev_tick() override;
@@ -64,7 +65,7 @@ public:
 protected:
   WalkState                  current_state_;
   ///! The state machine corresponds with CreepState for creep
-  StateMachine<WalkState>*   state_machine_;
+  // StateMachine<WalkState>*   state_machine_;
 
 ///! These methods are the callback methods for WalkState.
 private:
@@ -76,6 +77,8 @@ private:
   void swing_leg();
   ///! The callback for WK_STOP
   void stance();
+  ///! The callback for WK_SPIRALLING
+  void spiralling();
   ///! The callback for WK_XXX
   void walk();
   ///! The debug callback for WK_HANG
@@ -95,6 +98,10 @@ private:
    * @brief The criterion for WK_SWING
    */
   bool end_swing_leg();
+  /*!
+   * @brief The criterion for WK_STOP
+   */
+  bool end_stance();
   /*!
    * @brief Update the next foot point for the swing leg.
    *        The default next foot point is {STEP, XX, -BH},

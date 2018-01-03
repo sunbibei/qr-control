@@ -24,9 +24,9 @@ public:
 
 ///! These methods are inherited from super class.
 public:
-  virtual void              checkState()    override;
-  virtual StateMachineBase* state_machine() override;
-  AGENT_STATE               currentState()  const;
+  virtual void checkState() override;
+  virtual bool starting()   override;
+  virtual void stopping()   override;
 
 ///! These methods are the callback of AGENT_STATE.
 private:
