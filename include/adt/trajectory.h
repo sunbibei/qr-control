@@ -47,6 +47,9 @@ public:
   typedef Eigen::Matrix<_DataType, _Dim_X, Eigen::Dynamic> StateSeq;
 
 public:
+  /*!
+   * @brief The default constructor which nothing to do.
+   */
   Trajectory();
   /*!
    * @brief The constructor from the configure file at special tag _prefix.
@@ -77,6 +80,14 @@ public:
 public:
   ///! This method will set the coefficients.
   virtual void reset(const CoeffMat&);
+  ///! This method will clear the trajectory.
+  void reset();
+  ///! This method will set the range of parameters @t.
+  void range(_DataType _t0, _DataType _t1);
+  ///! This method return the start point
+  _DataType floor(bool* exit = nullptr);
+  ///! This method return the end   point
+  _DataType ceiling(bool* exit = nullptr);
   ///! This method sample the trajectory at parameter _t
   virtual StateVec sample(_DataType _t);
   ///! This method products a sequence through discretizing the trajectory.
@@ -88,12 +99,14 @@ public:
   ///! TODO
   ///! Integral at some point
   // virtual StateVec integral(_DataType _t);
-  ///! integral trajectory object
-  // virtual Trajectory<_DataType, _Dim_X> integral();
+  ///! integral trajectory object under given sample
+  virtual Trajectory<_DataType, _Dim_X> integral(const _DataType& _t0, const StateVec& _y0);
 
 protected:
   CoeffMat     coeffs_;
   Eigen::Index dim_exp_;
+  _DataType    range_[2]; // 0 --> min; 1 --> max
+  bool         is_range_;
 
 public:
   template<typename _T1>
@@ -129,6 +142,8 @@ template<typename _DataType>
 inline Eigen::Matrix<_DataType, Eigen::Dynamic, 1>
 __get_int_vec(const _DataType& _t, const Eigen::Index& _exp);
 
+template<typename _DataType>
+inline _DataType __clamp(const _DataType& _t, const _DataType& _low, const _DataType& _hi);
 
 ///////////////////////////////////////////////////////////////////////////////
 ////////////        The implementation of template methods         ////////////
@@ -136,7 +151,7 @@ __get_int_vec(const _DataType& _t, const Eigen::Index& _exp);
 
 template<typename _DataType, int _Dim_X>
 Trajectory<_DataType, _Dim_X>::Trajectory()
-  : dim_exp_(0) {
+  : dim_exp_(0), is_range_(false) {
   ; // Nothing to do here.
 }
 
@@ -148,13 +163,14 @@ Trajectory<_DataType, _Dim_X>::Trajectory(const MiiString& _prefix)
 
 template<typename _DataType, int _Dim_X>
 Trajectory<_DataType, _Dim_X>::Trajectory(const CoeffMat& _coeff)
-  : coeffs_(_coeff) {
+  : coeffs_(_coeff), is_range_(false) {
   assert(coeffs_.rows() == _Dim_X);
   dim_exp_ = coeffs_.cols();
 }
 
 template<typename _DataType, int _Dim_X>
-Trajectory<_DataType, _Dim_X>::Trajectory(const std::vector<_DataType>& _coeff) {
+Trajectory<_DataType, _Dim_X>::Trajectory(const std::vector<_DataType>& _coeff)
+  : is_range_(false) {
   assert(0 == (_coeff.size()%_Dim_X));
   dim_exp_ = _coeff.size() / _Dim_X;
   coeffs_.resize(_Dim_X, dim_exp_);
@@ -166,8 +182,12 @@ Trajectory<_DataType, _Dim_X>::Trajectory(const std::vector<_DataType>& _coeff) 
 
 template<typename _DataType, int _Dim_X>
 Trajectory<_DataType, _Dim_X>::Trajectory(const Trajectory<_DataType, _Dim_X>& _o)
-  : coeffs_(_o.coeffs_), dim_exp_(_o.dim_exp_) {
-  ;
+  : coeffs_(_o.coeffs_), dim_exp_(_o.dim_exp_),
+    is_range_(_o.is_range_) {
+  if (is_range_) {
+    range_[0] = _o.range_[0];
+    range_[1] = _o.range_[1];
+  }
 }
 
 template<typename _DataType, int _Dim_X>
@@ -175,6 +195,11 @@ Trajectory<_DataType, _Dim_X>&
 Trajectory<_DataType, _Dim_X>::operator=(const Trajectory<_DataType, _Dim_X>& _o) {
   dim_exp_ = _o.dim_exp_;
   coeffs_  = _o.coeffs_;
+  is_range_= _o.is_range_;
+  if (is_range_) {
+    range_[0] = _o.range_[0];
+    range_[1] = _o.range_[1];
+  }
   return *this;
 }
 
@@ -187,9 +212,38 @@ void Trajectory<_DataType, _Dim_X>::reset(const CoeffMat& _new_coeff) {
 }
 
 template<typename _DataType, int _Dim_X>
+void Trajectory<_DataType, _Dim_X>::reset() {
+  coeffs_.fill(0.0);
+  dim_exp_ = 0;
+  is_range_= false;
+}
+
+template<typename _DataType, int _Dim_X>
+void Trajectory<_DataType, _Dim_X>::range(_DataType _t0, _DataType _t1) {
+  range_[0] = _t0;
+  range_[1] = _t1;
+
+  is_range_ = true;
+}
+
+template<typename _DataType, int _Dim_X>
+_DataType Trajectory<_DataType, _Dim_X>::floor(bool* exit) {
+  if (exit) *exit = is_range_;
+  return range_[0];
+}
+
+template<typename _DataType, int _Dim_X>
+_DataType Trajectory<_DataType, _Dim_X>::ceiling(bool* exit) {
+  if (exit) *exit = is_range_;
+  return range_[1];
+}
+
+template<typename _DataType, int _Dim_X>
 typename Trajectory<_DataType, _Dim_X>::StateVec
 Trajectory<_DataType, _Dim_X>::sample(_DataType _t) {
   assert(0 != coeffs_.cols());
+  if (is_range_) _t = __clamp(_t, range_[0], range_[1]);
+
   return coeffs_ * __get_state_vec<_DataType>(_t, dim_exp_);
 }
 
@@ -198,6 +252,10 @@ typename Trajectory<_DataType, _Dim_X>::StateSeq
 Trajectory<_DataType, _Dim_X>::sequence(
     _DataType _from, _DataType _to, _DataType _dt) {
   assert((_to > _from) && (0 != _dt));
+  if (is_range_) {
+    if (_from < range_[0]) _from = range_[0];
+    if (_to   > range_[1]) _to   = range_[1];
+  }
   typename Trajectory<_DataType, _Dim_X>::StateSeq ret;
   ret.resize(_Dim_X, (_to - _from) / _dt + 1);
 
@@ -211,6 +269,7 @@ Trajectory<_DataType, _Dim_X>::sequence(
 template<typename _DataType, int _Dim_X>
 typename Trajectory<_DataType, _Dim_X>::StateVec
 Trajectory<_DataType, _Dim_X>::differential(_DataType _t) {
+
   return coeffs_ * __get_diff_vec(_t, dim_exp_);
 }
 
@@ -218,30 +277,36 @@ template<typename _DataType, int _Dim_X>
 Trajectory<_DataType, _Dim_X>
 Trajectory<_DataType, _Dim_X>::differential() {
   Trajectory<_DataType, _Dim_X> ret(*this);
+  --ret.dim_exp_;
+  ret.coeffs_.resize(Eigen::NoChange, ret.dim_exp_);
+
+
   for (auto col = 1; col < coeffs_.cols(); ++col)
     ret.coeffs_.col(col-1) = col*coeffs_.col(col);
 
-  ret.coeffs_.col(dim_exp_-1).fill(0);
   return ret;
 }
 
-/*template<typename _DataType, int _Dim_X>
-typename Trajectory<_DataType, _Dim_X>::StateVec
-Trajectory<_DataType, _Dim_X>::integral(_DataType _t) {
-  return coeffs_ * __get_int_vec(_t, dim_exp_);
-}
+//template<typename _DataType, int _Dim_X>
+//typename Trajectory<_DataType, _Dim_X>::StateVec
+//Trajectory<_DataType, _Dim_X>::integral(_DataType _t) {
+//  return coeffs_ * __get_int_vec(_t, dim_exp_);
+//}
 
 template<typename _DataType, int _Dim_X>
 Trajectory<_DataType, _Dim_X>
-Trajectory<_DataType, _Dim_X>::integral() {
+Trajectory<_DataType, _Dim_X>::integral(const _DataType& _t0, const StateVec& _y0) {
   Trajectory<_DataType, _Dim_X> ret(*this);
+  ++ret.dim_exp_;
+  ret.coeffs_.resize(Eigen::NoChange, ret.dim_exp_);
 
-  for (auto col = 1; col < coeffs_.cols(); ++col)
-    ret.coeffs_.col(col-1) = col*coeffs_.col(col);
+  ret.coeffs_.col(0).fill(0);
+  for (auto col = 1; col <= coeffs_.cols(); ++col)
+    ret.coeffs_.col(col) = coeffs_.col(col - 1) / col;
 
-  ret.coeffs_.col(dim_exp_-1).fill(0);
+  ret.coeffs_.col(0) = _y0 - ret.sample(_t0);
   return ret;
-}*/
+}
 
 template<typename _DataType, int _Dim_X>
 Trajectory<_DataType, _Dim_X>::~Trajectory() {
@@ -362,6 +427,12 @@ __get_int_vec(const _DataType& _t, const Eigen::Index& _exp) {
   for (Eigen::Index idx = 1; idx < _vec.rows(); ++idx)
     _vec(idx) *= (1/(idx+1));
   return _vec;
+}
+
+template<typename _DataType>
+inline _DataType __clamp(const _DataType& _t, const _DataType& _low, const _DataType& _hi) {
+  return ( (_low < _hi) ? ( (_t < _low) ? _low : ( (_t > _hi ) ? (_hi ) : _t ) )
+                        : ( (_t < _hi)  ? _hi  : ( (_t > _low) ? (_low) : _t ) ) );
 }
 
 
