@@ -93,7 +93,7 @@ LegState QrLeg::leg_state()  {
   // TODO
   // Eigen::Vector3d _xyz;
   // forwardKinematics(_xyz);
-  // return ((-46 == _xyz.z()) ? LegState::TD_STATE : LegState::AIR_STATE);
+  // return ((eef().z() <= -46) ? LegState::TD_STATE : LegState::AIR_STATE);
   return (foot_force() > td_thres_) ? LegState::TD_STATE : LegState::AIR_STATE;
 }
 

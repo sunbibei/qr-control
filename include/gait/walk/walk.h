@@ -33,6 +33,7 @@ enum WalkState {
   WK_INIT_POSE = 0,
   WK_MOVE_COG,
   WK_SWING,
+  WK_SWING_1,
   WK_STOP,
   WK_SPIRALLING,
   WK_HANG,
@@ -121,15 +122,24 @@ private:
    *        The order as follow:
    *        HL -> FL -> HR -> FR
    *
-   *        **NOTE**: This method ONLY be called before the swing leg.
+   *        **NOTE**: This method ONLY be called after the end of swing leg.
    */
   LegType next_leg(const LegType);
 
   /*!
-   * @brief It get a reference of next COG coordination when given the current
+   * @brief It get a reference of next COG coordination when given the following
    *        swing leg.
    */
-  Eigen::Vector2d prog_next_cog();
+  Eigen::Vector2d prog_next_cog(LegType _fsl);
+  /*!
+   * @brief It get a reference of next foothold coordination under give the
+   *        following swing leg.
+   */
+  Eigen::Vector3d prog_next_fpt(LegType _fsl);
+  /*!
+   * @brief It control the phase of that the foot is close to stand.
+   */
+  void close_to_floor();
 protected:
   ///! The interface for body
   class QrBody*         body_iface_;
@@ -149,7 +159,7 @@ protected:
   ///! The trajectory for moving COG
   Trajectory3d*    cog2eef_traj_[LegType::N_LEGS];
 
-  ///! The current swing leg
+  ///! The following swing leg, it indicates the following swing leg at any time.
   LegType          swing_leg_;
   ///! The Control tick interval for send command(in ms)
   int64_t          post_tick_interval_;
@@ -162,6 +172,8 @@ protected:
 
 ///! These variables and methods are temporary.
 private:
+  ///! save the last close_to_floor eef target
+  Eigen::Vector3d ctf_eef_;
 //  Eigen::Vector2d cog_proj1();
 //  ///! The last position of swing leg
 //  Eigen::Vector3d last_foot_pos1_;
