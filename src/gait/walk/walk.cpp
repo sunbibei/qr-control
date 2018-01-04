@@ -108,6 +108,8 @@ struct WalkParam {
   double SWING_HEIGHT;
   ///! The orientation of forward walk.
   double FORWARD_ALPHA;
+  ///! The first target height scale
+  double STOP_HEIGHT_SCALE;
 
   ///! The time for moving COG(in ms)
   int64_t   COG_TIME;
@@ -117,12 +119,13 @@ struct WalkParam {
   WalkParam(const MiiString& _tag)
     : THRES_COG(6.5),    FOOT_STEP(10),
       STANCE_HEIGHT(46), SWING_HEIGHT(5),
-      FORWARD_ALPHA(0),
+      FORWARD_ALPHA(0),  STOP_HEIGHT_SCALE(0.3),
       COG_TIME(2000),    SWING_TIME(2000) {
     auto cfg = MiiCfgReader::instance();
-    cfg->get_value(_tag, "cog_threshold", THRES_COG);
+    cfg->get_value(_tag, "cog_threshold",THRES_COG);
     cfg->get_value(_tag, "step",         FOOT_STEP);
     cfg->get_value(_tag, "stance_height",STANCE_HEIGHT);
+    cfg->get_value(_tag, "stop_scale",   STOP_HEIGHT_SCALE);
     cfg->get_value(_tag, "swing_height", SWING_HEIGHT);
     cfg->get_value(_tag, "forward_orientation", FORWARD_ALPHA);
 
@@ -326,7 +329,6 @@ void Walk::checkState() {
     break;
   }
   case WalkState::WK_SWING:
-  case WalkState::WK_SWING_1:
   {
     ///! the begin of WK_SWING
     if (!timer_->running()) {
@@ -336,13 +338,19 @@ void Walk::checkState() {
       timer_->start();
     }
 
-    auto diff = (eef_traj_->sample(eef_traj_->ceiling()) - leg_ifaces_[swing_leg_]->eef()).norm();
-    if (diff < 0.1) {
-      ctf_eef_     = eef_traj_->sample(eef_traj_->ceiling());
-      ctf_eef_.z() = leg_ifaces_[LEGTYPE_SL(swing_leg_)]->eef().z();
+    auto diff = (eef_traj_->sample(eef_traj_->ceiling()).head(2)
+        - leg_ifaces_[swing_leg_]->eef().head(2)).norm();
+    LOG_EVERY_N(INFO, 20) << "Difference: " << diff;
+    if (diff < 0.2) {
+      LOG_INFO << "Change to WalkState::WK_SWING_1";
       current_state_ = WalkState::WK_SWING_1;
     }
 
+    break;
+  }
+  case WalkState::WK_SWING_1:
+  {
+    ///! judge whether is end
     if (!end_swing_leg()) return;
 
     ///! the end of WK_SWING
@@ -414,7 +422,7 @@ void Walk::post_tick() {
 //  if (current_state_ == WalkState::WK_SWING) {
 //    __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
 //  } else
-    PRINT_POSS_VS_TARGET// PRINT_COMMAND
+    // PRINT_POSS_VS_TARGET// PRINT_COMMAND
 
 #ifdef PUB_ROS_TOPIC
   if(cmd_pub_->trylock()) {
@@ -494,19 +502,46 @@ void Walk::swing_leg() {
 }
 
 void Walk::close_to_floor() {
-  if (std::abs(leg_ifaces_[swing_leg_]->eef().z() - ctf_eef_.z()) < 0.01) {
-    ctf_eef_.z() = ctf_eef_.z() + 0.01;
+  ctf_eef_[swing_leg_].head(2) = eef_traj_->sample(eef_traj_->ceiling()).head(2);
+  auto _sl_fpt = leg_ifaces_[swing_leg_]->eef();
+  auto _dl_fpt = leg_ifaces_[LEGTYPE_DL(swing_leg_)]->eef();
+  ///! print the position.
+  __print_positions(_sl_fpt, _dl_fpt);
+
+  if (std::abs(_dl_fpt.z() - _sl_fpt.z()) < 0.3) {
+    if (LEGTYPE_IS_HIND(swing_leg_)) {
+      ctf_eef_[swing_leg_].z() = ctf_eef_[swing_leg_].z() - 0.01;
+      ctf_eef_[LEGTYPE_DL(swing_leg_)]     = _dl_fpt;
+      ctf_eef_[LEGTYPE_DL(swing_leg_)].z() = std::min(ctf_eef_[LEGTYPE_DL(swing_leg_)].z(), ctf_eef_[swing_leg_].z());
+      ctf_eef_[swing_leg_].z()             = ctf_eef_[LEGTYPE_DL(swing_leg_)].z();
+      ///! setting the DL command
+      leg_ifaces_[LEGTYPE_DL(swing_leg_)]->inverseKinematics(
+          ctf_eef_[LEGTYPE_DL(swing_leg_)], leg_cmds_[LEGTYPE_DL(swing_leg_)]->target);
+      LOG_INFO << "Setting DL target: " << ctf_eef_[swing_leg_].z();
+    } else
+      ; // Nothing to do here, waiting to end the swing leg state.
+  } else {
+    ctf_eef_[swing_leg_].z() = _dl_fpt.z();
+    LOG_INFO << "Setting SL target: " << ctf_eef_[swing_leg_].z();
   }
   // LOG_WARNING << "close to floor";
   ///! setting command.
-  leg_ifaces_[swing_leg_]->inverseKinematics(ctf_eef_, leg_cmds_[swing_leg_]->target);
+  leg_ifaces_[swing_leg_]->inverseKinematics(
+      ctf_eef_[swing_leg_], leg_cmds_[swing_leg_]->target);
 }
 
 bool Walk::end_swing_leg() {
-  auto diff = (eef_traj_->sample(eef_traj_->ceiling()) - leg_ifaces_[swing_leg_]->eef()).norm();
+  auto diff = (ctf_eef_[swing_leg_] - leg_ifaces_[swing_leg_]->eef()).norm();
 
   ///! for real robot
-  return ((diff < 1) && (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()));
+  return ( (LEGTYPE_IS_FRONT(swing_leg_)) ?
+            ( (diff < 0.3) || (timer_->span() > 2*params_->SWING_TIME) )
+            : (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) );
+
+//  return ( (diff < 1) && ( (LEGTYPE_IS_HIND(swing_leg_)) ?
+//      (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state())
+//      : (std::abs(leg_ifaces_[LEGTYPE_SL(swing_leg_)]->eef().z() - leg_ifaces_[swing_leg_]->eef().z()) < 0.1) ) );
+
   ///! for rviz
   // return ((LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) || (timer_->span() > 2*params_->SWING_TIME));
 
@@ -585,7 +620,7 @@ Eigen::Vector3d Walk::prog_next_fpt(LegType _fsl) {
     _next_fpt.x() += params_->FOOT_STEP;
     _next_fpt.y()  = _last_fpt.y() + std::abs(_next_fpt.x() - _last_fpt.x()) * tan(params_->FORWARD_ALPHA);
   }
-  _next_fpt.z() = _last_fpt.z() + 0.1*params_->SWING_HEIGHT;
+  _next_fpt.z() = _last_fpt.z()/* + 0.3*params_->SWING_HEIGHT*/;
 
   return _next_fpt;
 }

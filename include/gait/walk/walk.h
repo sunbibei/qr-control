@@ -173,7 +173,7 @@ protected:
 ///! These variables and methods are temporary.
 private:
   ///! save the last close_to_floor eef target
-  Eigen::Vector3d ctf_eef_;
+  Eigen::Vector3d ctf_eef_[LegType::N_LEGS];
 //  Eigen::Vector2d cog_proj1();
 //  ///! The last position of swing leg
 //  Eigen::Vector3d last_foot_pos1_;
