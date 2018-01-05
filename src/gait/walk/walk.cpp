@@ -115,6 +115,12 @@ struct WalkParam {
   int64_t   COG_TIME;
   ///! The time for swing leg (in ms)
   int64_t   SWING_TIME;
+  ///! The time for swing leg in rise phase (in s)
+  double   SWING_RISE;
+  ///! The time for swing leg in approach phase (in s)
+  double   SWING_APPROACH;
+  ///! The time for swing leg in drop phase (in s)
+  double   SWING_DROP;
 
   WalkParam(const MiiString& _tag)
     : THRES_COG(6.5),    FOOT_STEP(10),
@@ -131,6 +137,10 @@ struct WalkParam {
 
     cfg->get_value(_tag, "cog_time",     COG_TIME);
     cfg->get_value(_tag, "swing_time",   SWING_TIME);
+
+    cfg->get_value(_tag, "swing_rise",     SWING_RISE);
+    cfg->get_value(_tag, "swing_approach", SWING_APPROACH);
+    cfg->get_value(_tag, "swing_drop",     SWING_DROP);
   }
 };
 
@@ -241,7 +251,7 @@ bool Walk::starting() {
 #endif
 
   timer_    = new TimeControl;
-  eef_traj_ = new Trajectory3d;
+  eef_traj_ = new SegTrajectory3d;
   for (auto& t : cog2eef_traj_)
     t = new Trajectory3d;
 
@@ -338,13 +348,36 @@ void Walk::checkState() {
       timer_->start();
     }
 
-    auto diff = (eef_traj_->sample(eef_traj_->ceiling()).head(2)
-        - leg_ifaces_[swing_leg_]->eef().head(2)).norm();
-    LOG_EVERY_N(INFO, 20) << "Difference: " << diff;
-    if (diff < 0.2) {
-      LOG_INFO << "Change to WalkState::WK_SWING_1";
-      current_state_ = WalkState::WK_SWING_1;
-    }
+//    auto diff = (eef_traj_->sample(eef_traj_->ceiling()).head(2)
+//        - leg_ifaces_[swing_leg_]->eef().head(2)).norm();
+//    LOG_EVERY_N(INFO, 20) << "Difference: " << diff;
+//    if (diff < 0.2) {
+//      LOG_INFO << "Change to WalkState::WK_SWING_1";
+//      current_state_ = WalkState::WK_SWING_1;
+//    }
+
+    ///! judge whether is end
+    if (!end_swing_leg()) return;
+
+    ///! the end of WK_SWING
+    timer_->stop(&_s_tmp_span);
+    LOG_WARNING << "*******----END SWING LEG("
+        << _s_tmp_span << "ms)----*******";
+
+    Eigen::Vector3d _fpt = eef_traj_->sample(eef_traj_->ceiling());
+    __print_positions(leg_ifaces_[swing_leg_]->eef(), _fpt);
+    PRESS_THEN_GO
+
+    ///! Every twice swing leg then adjusting COG.
+    if ((LegType::FL == swing_leg_) || (LegType::FR == swing_leg_)) {
+      current_state_ = WalkState::WK_MOVE_COG;
+    } else
+      current_state_ = WalkState::WK_SWING;
+    ///! clear the old trajectory.
+    eef_traj_->reset();
+    ///! program the next swing leg
+    swing_leg_ = next_leg(swing_leg_);
+    break;
 
     break;
   }
@@ -494,8 +527,7 @@ void Walk::swing_leg() {
 //  auto diff = (eef_traj_->sample(eef_traj_->ceiling()) - leg_ifaces_[swing_leg_]->eef()).norm();
 //  if (diff > 0.1) {
     leg_ifaces_[swing_leg_]->inverseKinematics(
-        eef_traj_->sample((double)timer_->span()/params_->SWING_TIME),
-        leg_cmds_[swing_leg_]->target);
+        eef_traj_->sample(timer_->span()/1000.0), leg_cmds_[swing_leg_]->target);
 //  } else {
 //    close_to_floor();
 //  }
@@ -534,24 +566,24 @@ bool Walk::end_swing_leg() {
   auto diff = (ctf_eef_[swing_leg_] - leg_ifaces_[swing_leg_]->eef()).norm();
 
   ///! for real robot
-  return ( (LEGTYPE_IS_FRONT(swing_leg_)) ?
-            ( (diff < 0.3) || (timer_->span() > 2*params_->SWING_TIME) )
-            : (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) );
+//  return ( (LEGTYPE_IS_FRONT(swing_leg_)) ?
+//            ( (diff < 0.3) || (timer_->span() > 2*params_->SWING_TIME) )
+//            : (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) );
 
 //  return ( (diff < 1) && ( (LEGTYPE_IS_HIND(swing_leg_)) ?
 //      (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state())
 //      : (std::abs(leg_ifaces_[LEGTYPE_SL(swing_leg_)]->eef().z() - leg_ifaces_[swing_leg_]->eef().z()) < 0.1) ) );
 
   ///! for rviz
-  // return ((LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) || (timer_->span() > 2*params_->SWING_TIME));
+  return ((LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) || (timer_->span() > 2*params_->SWING_TIME));
 
 }
 
 // TODO
 void Walk::stance() {
-  FOR_EACH_LEG(l) {
-    ;
-  }
+//  FOR_EACH_LEG(l) {
+//    ;
+//  }
 }
 
 bool Walk::end_stance() {
@@ -573,34 +605,143 @@ void Walk::prog_eef_traj() {
   Eigen::Vector3d _last_fpt = leg_ifaces_[swing_leg_]->eef();
   Eigen::Vector3d _next_fpt = prog_next_fpt(swing_leg_);
 
-  Eigen::MatrixXd A;
-  A.resize(5, 5);
-  ///!  X = a0 + a1 *t + a2 * t^2 + a3 * t^3 + a4 * t^4
-  ///!  X'(0) = 0; X'(1) = 0; X(0) = p0; X(1) = p1; X(0.5) = ptop;
-  A << 0,   1,    0,     0,      0,
-       0,   1,    2,     3,      4,
-       1,   0,    0,     0,      0,
-       1,   1,    1,     1,      1,
-       1, 0.5, 0.25, 0.125, 0.0625;
+  Eigen::Vector3d _rise_fpt = _last_fpt;
+  _rise_fpt.z() = _last_fpt.z() + 0.3*params_->SWING_HEIGHT;
 
-  Eigen::MatrixXd b;
-  b.resize(5, 3);
-  b.row(0) << 0, 0, 0;
+  Eigen::Vector3d _appr_fpt = _next_fpt;
+  _appr_fpt.z() = _next_fpt.z() + 0.3*params_->SWING_HEIGHT;
+
+  Eigen::Vector3d _top_fpt(
+      (_rise_fpt.x()/2 + _appr_fpt.x()/2),
+      (_rise_fpt.y()/2 + _appr_fpt.y()/2),
+      (_last_fpt.z() + params_->SWING_HEIGHT));
+
+  double _t0 = 0;
+  double _t1 = _t0 + params_->SWING_RISE;
+  double _t3 = _t1 + params_->SWING_APPROACH;
+  double _t4 = _t3 + params_->SWING_DROP;
+  double _t2 = 0.5*(_t1 + _t3);
+  Eigen::MatrixXd A, b, x;
+  Eigen::VectorXd row;
+  ///////////////////////////////////////////////////////////
+  ///! THE RISE PHASE
+  ///!  R = a0 + a1 *t + a2 * t^2 + a3 * t^3
+  ///!  R'(t0) = 0; R''(t0) = 0; R(t0) = p0; R(t1) = p1;
+  ///////////////////////////////////////////////////////////
+  A.resize(4, 4);
+  b.resize(4, 3);
+//  Eigen::Vector3d _dif_3th_coef(1, 2, 3);
+//  Eigen::VectorXd row = __get_state_vec(_t0, 3);
+  ///! R'(t0) = 0;
+  A.row(0) = __get_diff_vec(_t0, 4);
+  // std::cout << A.row(0) << std::endl;
+  // A.row(0)(0) = 0; A.row(0).tail(3) = _dif_3th_coef.cwiseProduct(row);
+  b.row(0)    << 0, 0, 0;
+  ///! R''(t0) = 0;
+  Eigen::Vector2d _ddif_3th_coef(2*1, 3*2);
+  row = __get_state_vec(_t0, 2);
+  A.row(1).head(2).fill(0.0); A.row(1).tail(2) = _ddif_3th_coef.cwiseProduct(row);
   b.row(1) << 0, 0, 0;
+  ///! R(t0) = last_fpt
+  A.row(2) =  __get_state_vec(_t0, 4);
   b.row(2) = _last_fpt;
-  b.row(3) = _next_fpt;
-  b.row(4) << (_last_fpt.x()/2 + _next_fpt.x()/2), (_last_fpt.y()/2 + _next_fpt.y()/2), (_last_fpt.z() + params_->SWING_HEIGHT);
+  ///! R(t1) = rise_fpt
+  A.row(3) =  __get_state_vec(_t1, 4);
+  b.row(3) = _rise_fpt;
 
-  Eigen::MatrixXd c;
+//  std::cout << "rise - A:\n" << A << std::endl;
+//  std::cout << "rise - b:\n" << b << std::endl;
   if (0 == A.determinant()) {
-    c = A.householderQr().solve(b);
-    std::cout << "NO cross point, Using this result: " << c.transpose() << std::endl;
+    x = A.householderQr().solve(b);
+    std::cout << "NO trajectory results, Using this result: " << x.transpose() << std::endl;
   } else {
-    c = A.partialPivLu().solve(b);
+    x = A.partialPivLu().solve(b);
   }
 
-  eef_traj_->range(0, 1);
-  eef_traj_->reset(c.transpose());
+  Trajectory3d rise_traj(x.transpose());
+  ///////////////////////////////////////////////////////////
+  ///! THE DROP PHASE
+  ///!  D = a0 + a1 *t + a2 * t^2 + a3 * t^3
+  ///!  D'(t4) = 0; D''(t4) = 0; D(t3) = p3; D(t4) = p4;
+  ///////////////////////////////////////////////////////////
+  A.resize(4, 4);
+  b.resize(4, 3);
+  ///! D'(t4)  = 0
+  // row = __get_state_vec<double>(_t3, 3);
+  A.row(0) = __get_diff_vec(_t4, 4);
+  // A.row(0)(0) = 0; A.row(0).tail(3) = _dif_3th_coef.cwiseProduct(row);
+  b.row(0).fill(0.0);
+  ///! D''(t4) = 0
+  row = __get_state_vec<double>(_t4, 2);
+  A.row(1).head(2).fill(0.0); A.row(1).tail(2) = _ddif_3th_coef.cwiseProduct(row);
+  b.row(1).fill(0.0);
+  ///! D(t3) = p3
+  A.row(2) = __get_state_vec<double>(_t3, 4);
+  b.row(2) = _appr_fpt;
+  ///! D(t4) = p4
+  A.row(3) = __get_state_vec<double>(_t4, 4);
+  b.row(3) = _next_fpt;
+
+//  std::cout << "drop - A:\n" << A << std::endl;
+//  std::cout << "drop - b:\n" << b << std::endl;
+  if (0 == A.determinant()) {
+    x = A.householderQr().solve(b);
+    std::cout << "NO trajectory results, Using this result: " << x.transpose() << std::endl;
+  } else {
+    x = A.partialPivLu().solve(b);
+  }
+
+  Trajectory3d drop_traj(x.transpose());
+  ///////////////////////////////////////////////////////////
+  ///! THE APPROACH PHASE
+  ///!  A = a0 + a1 *t + a2 * t^2 + a3 * t^3 + a4 * t^4 + a5 * t^5 + a6 * t^6
+  ///!  A(t1) = p1; A'(t1) = R'(t1); A''(t1) = R''(t1);
+  ///!  A(t2) = p2
+  ///!  A(t3) = p3; A'(t3) = D'(t3); A''(t3) = D''(t3);
+  ///////////////////////////////////////////////////////////
+  A.resize(7, 7);
+  b.resize(7, 3);
+  ///! A(t1) = p1
+  A.row(0)    = __get_state_vec(_t1, 7);
+  b.row(0)    = _rise_fpt;
+  ///! A'(t1) = R'(t1)
+  A.row(1)    = __get_diff_vec(_t1, 7);
+  b.row(1)    = rise_traj.differential(_t1);
+  ///! A''(t1) = R''(t1)
+  Eigen::VectorXd _ddif_7th_coef;
+  _ddif_7th_coef.resize(5);
+  _ddif_7th_coef << (2*1), (3*2), (4*3), (5*4), (6*5);
+  row         = __get_state_vec(_t1, 5);
+  A.row(2).head(2).fill(0.0); A.row(2).tail(5) = _ddif_7th_coef.cwiseProduct(row);
+  b.row(2)    = rise_traj.differential().differential(_t1);
+  ///! A(t2) = p2
+  A.row(3) = __get_state_vec(_t2, 7);
+  b.row(3) = _top_fpt;
+  ///! A(t3) = p3
+  A.row(4) = __get_state_vec(_t3, 7);
+  b.row(4) = _appr_fpt;
+  ///! A'(t3) = D'(t3)
+  A.row(5) = __get_diff_vec(_t3, 7);
+  b.row(5) = drop_traj.differential(_t3);
+  ///! A''(t3) = D''(t3)
+  row      = __get_state_vec(_t3, 5);
+  A.row(6).head(2).fill(0.0); A.row(6).tail(5) = _ddif_7th_coef.cwiseProduct(row);
+  b.row(6) = drop_traj.differential().differential(_t3);
+
+//  std::cout << "appr - A:\n" << A << std::endl;
+//  std::cout << "appr - b:\n" << b << std::endl;
+  if (0 == A.determinant()) {
+    x = A.householderQr().solve(b);
+    std::cout << "NO trajectory results, Using this result: " << x.transpose() << std::endl;
+  } else {
+    x = A.partialPivLu().solve(b);
+  }
+
+  Trajectory3d appr_traj(x.transpose());
+
+  eef_traj_->add(rise_traj, _t0, _t1);
+  eef_traj_->add(appr_traj, _t1, _t3);
+  eef_traj_->add(drop_traj, _t3, _t4);
   std::cout << "Trajectory:\n" << *eef_traj_ << std::endl;
 }
 

@@ -9,7 +9,7 @@
 #define INCLUDE_GAIT_WALK_WALK_H_
 
 #include "gait/gait_base.h"
-#include "adt/trajectory.h"
+#include "adt/seg_trajectory.h"
 
 #include <Eigen/Dense>
 
@@ -155,7 +155,7 @@ protected:
   TimeControl*     timer_;
 
   ///! The trajectory for swing leg
-  Trajectory3d*    eef_traj_;
+  SegTrajectory3d* eef_traj_;
   ///! The trajectory for moving COG
   Trajectory3d*    cog2eef_traj_[LegType::N_LEGS];
 

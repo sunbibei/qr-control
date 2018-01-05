@@ -45,6 +45,10 @@ public:
   typedef Eigen::Matrix<_DataType, _Dim_X, Eigen::Dynamic> CoeffMat;
   typedef Eigen::Matrix<_DataType, _Dim_X, 1>              StateVec;
   typedef Eigen::Matrix<_DataType, _Dim_X, Eigen::Dynamic> StateSeq;
+  typedef struct {
+    _DataType floor;
+    _DataType ceiling;
+  } Range;
 
 public:
   /*!
@@ -75,19 +79,14 @@ public:
    * @param coeff The list of coefficient.
    */
   Trajectory<_DataType, _Dim_X>& operator=(const Trajectory<_DataType, _Dim_X>&);
+  /*!
+   * @brief The deconstructor
+   */
   virtual ~Trajectory();
 
 public:
   ///! This method will set the coefficients.
   virtual void reset(const CoeffMat&);
-  ///! This method will clear the trajectory.
-  void reset();
-  ///! This method will set the range of parameters @t.
-  void range(_DataType _t0, _DataType _t1);
-  ///! This method return the start point
-  _DataType floor(bool* exit = nullptr);
-  ///! This method return the end   point
-  _DataType ceiling(bool* exit = nullptr);
   ///! This method sample the trajectory at parameter _t
   virtual StateVec sample(_DataType _t);
   ///! This method products a sequence through discretizing the trajectory.
@@ -102,11 +101,18 @@ public:
   ///! integral trajectory object under given sample
   virtual Trajectory<_DataType, _Dim_X> integral(const _DataType& _t0, const StateVec& _y0);
 
+  ///! This method will clear the trajectory.
+  void reset();
+  ///! This method will set the range of parameters @t.
+  void range(_DataType _t0, _DataType _t1);
+  ///! This method return the start point
+  _DataType floor(bool* exit = nullptr)   const;
+  ///! This method return the end   point
+  _DataType ceiling(bool* exit = nullptr) const;
 protected:
   CoeffMat     coeffs_;
   Eigen::Index dim_exp_;
-  _DataType    range_[2]; // 0 --> min; 1 --> max
-  bool         is_range_;
+  Range*       range_;
 
 public:
   template<typename _T1>
@@ -151,7 +157,7 @@ inline _DataType __clamp(const _DataType& _t, const _DataType& _low, const _Data
 
 template<typename _DataType, int _Dim_X>
 Trajectory<_DataType, _Dim_X>::Trajectory()
-  : dim_exp_(0), is_range_(false) {
+  : dim_exp_(0), range_(nullptr) {
   ; // Nothing to do here.
 }
 
@@ -163,14 +169,14 @@ Trajectory<_DataType, _Dim_X>::Trajectory(const MiiString& _prefix)
 
 template<typename _DataType, int _Dim_X>
 Trajectory<_DataType, _Dim_X>::Trajectory(const CoeffMat& _coeff)
-  : coeffs_(_coeff), is_range_(false) {
+  : coeffs_(_coeff), range_(nullptr) {
   assert(coeffs_.rows() == _Dim_X);
   dim_exp_ = coeffs_.cols();
 }
 
 template<typename _DataType, int _Dim_X>
 Trajectory<_DataType, _Dim_X>::Trajectory(const std::vector<_DataType>& _coeff)
-  : is_range_(false) {
+  : range_(nullptr) {
   assert(0 == (_coeff.size()%_Dim_X));
   dim_exp_ = _coeff.size() / _Dim_X;
   coeffs_.resize(_Dim_X, dim_exp_);
@@ -182,11 +188,10 @@ Trajectory<_DataType, _Dim_X>::Trajectory(const std::vector<_DataType>& _coeff)
 
 template<typename _DataType, int _Dim_X>
 Trajectory<_DataType, _Dim_X>::Trajectory(const Trajectory<_DataType, _Dim_X>& _o)
-  : coeffs_(_o.coeffs_), dim_exp_(_o.dim_exp_),
-    is_range_(_o.is_range_) {
-  if (is_range_) {
-    range_[0] = _o.range_[0];
-    range_[1] = _o.range_[1];
+  : coeffs_(_o.coeffs_), dim_exp_(_o.dim_exp_), range_(nullptr) {
+  if (_o.range_) {
+    range_ = new Range;
+    memcpy(range_, _o.range_, sizeof(Range));
   }
 }
 
@@ -195,10 +200,12 @@ Trajectory<_DataType, _Dim_X>&
 Trajectory<_DataType, _Dim_X>::operator=(const Trajectory<_DataType, _Dim_X>& _o) {
   dim_exp_ = _o.dim_exp_;
   coeffs_  = _o.coeffs_;
-  is_range_= _o.is_range_;
-  if (is_range_) {
-    range_[0] = _o.range_[0];
-    range_[1] = _o.range_[1];
+  delete range_;
+  if (_o.range_) {
+    range_ = new Range;
+    memcpy(range_, _o.range_, sizeof(Range));
+  } else {
+    range_ = nullptr;
   }
   return *this;
 }
@@ -215,34 +222,37 @@ template<typename _DataType, int _Dim_X>
 void Trajectory<_DataType, _Dim_X>::reset() {
   coeffs_.fill(0.0);
   dim_exp_ = 0;
-  is_range_= false;
+  delete range_;
+  range_ = nullptr;
 }
 
 template<typename _DataType, int _Dim_X>
 void Trajectory<_DataType, _Dim_X>::range(_DataType _t0, _DataType _t1) {
-  range_[0] = _t0;
-  range_[1] = _t1;
+  if (!range_) range_ = new Range;
 
-  is_range_ = true;
+  range_->floor   = _t0;
+  range_->ceiling = _t1;
 }
 
 template<typename _DataType, int _Dim_X>
-_DataType Trajectory<_DataType, _Dim_X>::floor(bool* exit) {
-  if (exit) *exit = is_range_;
-  return range_[0];
+_DataType Trajectory<_DataType, _Dim_X>::floor(bool* exit) const {
+  if (exit) *exit = (nullptr != range_);
+
+  return (range_) ? range_->floor : std::numeric_limits<_DataType>::min();
 }
 
 template<typename _DataType, int _Dim_X>
-_DataType Trajectory<_DataType, _Dim_X>::ceiling(bool* exit) {
-  if (exit) *exit = is_range_;
-  return range_[1];
+_DataType Trajectory<_DataType, _Dim_X>::ceiling(bool* exit) const {
+  if (exit) *exit = (nullptr != range_);
+
+  return (range_) ? range_->ceiling : std::numeric_limits<_DataType>::max();
 }
 
 template<typename _DataType, int _Dim_X>
 typename Trajectory<_DataType, _Dim_X>::StateVec
 Trajectory<_DataType, _Dim_X>::sample(_DataType _t) {
   assert(0 != coeffs_.cols());
-  if (is_range_) _t = __clamp(_t, range_[0], range_[1]);
+  if (range_) _t = __clamp(_t, range_->floor, range_->ceiling);
 
   return coeffs_ * __get_state_vec<_DataType>(_t, dim_exp_);
 }
@@ -252,9 +262,9 @@ typename Trajectory<_DataType, _Dim_X>::StateSeq
 Trajectory<_DataType, _Dim_X>::sequence(
     _DataType _from, _DataType _to, _DataType _dt) {
   assert((_to > _from) && (0 != _dt));
-  if (is_range_) {
-    if (_from < range_[0]) _from = range_[0];
-    if (_to   > range_[1]) _to   = range_[1];
+  if (range_) {
+    if (_from < range_->floor)   _from = range_->floor;
+    if (_to   > range_->ceiling) _to   = range_->ceiling;
   }
   typename Trajectory<_DataType, _Dim_X>::StateSeq ret;
   ret.resize(_Dim_X, (_to - _from) / _dt + 1);
@@ -323,6 +333,8 @@ std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, _T2>& traj) {
       os << std::setw(10) << std::setprecision(2) << _coeff(j);
       os << " t^" << std::to_string(j);
     }
+    if (traj.range_) os << ",\tt \\in (" << traj.range_->floor
+        << ", " << traj.range_->ceiling << ")";
     os << "\n";
   }
   return os;
@@ -338,6 +350,8 @@ std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 1>& traj) {
     os << std::setw(10) << std::setprecision(2) << _coeff(j);
     os << " t^" << std::to_string(j);
   }
+  if (traj.range_) os << ",\tt \\in (" << traj.range_->floor
+      << ", " << traj.range_->ceiling << ")";
   os << "\n";
 
   return os;
@@ -353,6 +367,8 @@ std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 2>& traj) {
       os << std::setw(10) << std::setprecision(2) << _coeff(j);
       os << " t^" << std::to_string(j);
     }
+    if (traj.range_) os << ",\tt \\in (" << traj.range_->floor
+        << ", " << traj.range_->ceiling << ")";
     os << "\n";
   }
   // os << "The coefficients of the trajectory is :\n" << traj.coeffs_ << std::endl;
@@ -369,6 +385,8 @@ std::ostream& operator<<(std::ostream& os, const Trajectory<_T1, 3>& traj) {
       os << std::setw(10) << std::setprecision(2) << _coeff(j);
       os << " t^" << std::to_string(j);
     }
+    if (traj.range_) os << ",\tt \\in (" << traj.range_->floor
+        << ", " << traj.range_->ceiling << ")";
     os << "\n";
   }
   // os << "The coefficients of the trajectory is :\n" << traj.coeffs_ << std::endl;
