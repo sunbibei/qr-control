@@ -14,7 +14,7 @@
 #include <Eigen/Dense>
 
 #define DIS_JNT_LIMIT
-// #define PUB_ROS_TOPIC
+#define PUB_ROS_TOPIC
 #ifdef PUB_ROS_TOPIC
 #include <ros/ros.h>
 #include <boost/scoped_ptr.hpp>

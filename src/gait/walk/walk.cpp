@@ -451,17 +451,16 @@ void Walk::post_tick() {
     leg_ifaces_[leg]->move();
   }
 
-
 //  if (current_state_ == WalkState::WK_SWING) {
 //    __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
 //  } else
-    // PRINT_POSS_VS_TARGET// PRINT_COMMAND
+    PRINT_POSS_VS_TARGET// PRINT_COMMAND
 
 #ifdef PUB_ROS_TOPIC
   if(cmd_pub_->trylock()) {
     cmd_pub_->msg_.data.clear();
     for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-      const auto& cmds = jnts_pos_cmd_[l];
+      const auto& cmds = leg_cmds_[l]->target;
       for (const auto& j : {JntType::KNEE, JntType::HIP, JntType::YAW}) {
         cmd_pub_->msg_.data.push_back(cmds(j));
       }
@@ -606,10 +605,10 @@ void Walk::prog_eef_traj() {
   Eigen::Vector3d _next_fpt = prog_next_fpt(swing_leg_);
 
   Eigen::Vector3d _rise_fpt = _last_fpt;
-  _rise_fpt.z() = _last_fpt.z() + 0.3*params_->SWING_HEIGHT;
+  _rise_fpt.z() = _last_fpt.z() + 0.5*params_->SWING_HEIGHT;
 
   Eigen::Vector3d _appr_fpt = _next_fpt;
-  _appr_fpt.z() = _next_fpt.z() + 0.3*params_->SWING_HEIGHT;
+  _appr_fpt.z() = _next_fpt.z() + 0.5*params_->SWING_HEIGHT;
 
   Eigen::Vector3d _top_fpt(
       (_rise_fpt.x()/2 + _appr_fpt.x()/2),
@@ -1172,7 +1171,6 @@ void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
 //  printf("|LEG -| +0.0000| +0.0000| +0.0000| +0.0000|LEG -| +0.0000| +0.0000| +0.0000| +0.0000|\n");
   Eigen::VectorXd js[][LegType::N_LEGS] = {
       {fl, fr, hl, hr}, {tfl, tfr, thl, thr}};
-  Eigen::VectorXd tjs[] = {tfl, tfr, thl, thr};
 
   printf("_____________________________________________________________________________________\n");
   printf("| LEG |   YAW  |   HIP  |  KNEE  |  ERROR | LEG |   YAW  |   HIP  |  KNEE  |  ERROR |\n");
@@ -1189,9 +1187,9 @@ void __print_positions(const Eigen::VectorXd& fl, const Eigen::VectorXd& fr,
           double _min = _jnt->joint_position_min();
           double _max = _jnt->joint_position_max();
   #endif
-          if /*(JntType::HIP == j)*/ (js[l][leg + c](j) <= _min)
+          if (js[l][leg + c](j) <= _min)
             printf("| \033[31;1m%+7.04f\033[0m", js[l][leg + c](j));
-          else if /*(JntType::KNEE == j)*/ (js[l][leg](j) >= _max)
+          else if (js[l][leg + c](j) >= _max)
             printf("| \033[33;1m%+7.04f\033[0m", js[l][leg + c](j));
           else
             printf("| %+7.04f", js[l][leg + c](j));
