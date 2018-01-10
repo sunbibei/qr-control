@@ -9,6 +9,8 @@
 
 namespace qr_control {
 
+#ifdef XXX
+
 #define G (9.8)
 
 RobotBody::RobotBody() {
@@ -174,3 +176,5 @@ EV3 RobotBody::calCogVel(const EV3& dist, const int& t)
 
 /*#include <class_loader/class_loader_register_macro.h>
 CLASS_LOADER_REGISTER_CLASS(qr_control::RobotBody, Label)*/
+
+#endif
