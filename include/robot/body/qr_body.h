@@ -8,11 +8,11 @@
 #ifndef INCLUDE_ROBOT_BODY_QR_BODY_H_
 #define INCLUDE_ROBOT_BODY_QR_BODY_H_
 
-#include "math_body.h"
+#include "robot_body.h"
 
 namespace qr_control {
 
-class QrBody: public MathBody {
+class QrBody: public RobotBody {
 public:
   QrBody();
   virtual ~QrBody();
