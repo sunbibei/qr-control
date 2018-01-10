@@ -8,7 +8,7 @@
 #ifndef INCLUDE_ROBOT_LEG_ROBOT_LEG_H_
 #define INCLUDE_ROBOT_LEG_ROBOT_LEG_H_
 
-#include "adt/trajectory.h"
+#include <adt/trajectory.h>
 #include "robot/leg/math_leg.h"
 
 namespace qr_control {
@@ -71,12 +71,12 @@ public:
   /*!
    * @brief Set a trajectory target for a specially joint.
    */
-  void jointTrajectoryTarget (JntType, const Trajectory1d&);
+  void jointTrajectoryTarget (JntType, const Traj1dSp&);
   ///! The default order by knee, hip and yaw
   /*!
    * @brief Set a trajectory target for the leg.
    */
-  void jointTrajectoryTarget (const Trajectory3d&);
+  void jointTrajectoryTarget (const Traj3dSp&);
   /*!
    * @brief Set a end-effector pose target.
    */
@@ -93,31 +93,31 @@ public:
   /*!
    * @brief Set a end-effector trajectory target.
    */
-  void eefTrajectoryTarget   (const Trajectory3d&);
+  void eefTrajectoryTarget   (const Traj3dSp&);
 
   ///! getter target methods
-  const LegTarget&          legTarget             ();
-  const JntTarget&          jointTarget           ();
-  const Trajectory1d&       jointTrajectoryTarget ();
-  const Eigen::Quaterniond& eefOrientationTarget  ();
-  const Eigen::Vector3d&    eefPositionTarget     ();
-  const EefTarget&          eefTarget             ();
-  const Trajectory3d&       eefTrajectoryTarget   ();
+//  const LegTarget&          legTarget             ();
+//  const JntTarget&          jointTarget           ();
+//  const Trajectory1d&       jointTrajectoryTarget ();
+//  const Eigen::Quaterniond& eefOrientationTarget  ();
+//  const Eigen::Vector3d&    eefPositionTarget     ();
+//  const EefTarget&          eefTarget             ();
+//  const Trajectory3d&       eefTrajectoryTarget   ();
 
 ///! These are the helper methods
 protected:
   /*!
    * @brief The abstract method, is completed the joint trajectory target.
    */
-  virtual void followJntTrajectory(JntType, const Trajectory1d&) = 0;
+  virtual void followJntTrajectory(JntType, const Traj1dSp&) = 0;
   /*!
    * @brief The abstract method, is completed the leg trajectory target.
    */
-  virtual void followJntTrajectory(const Trajectory3d&) = 0;
+  virtual void followJntTrajectory(const Traj3dSp&) = 0;
   /*!
    * @brief The abstract method, is completed the end-effector trajectory target.
    */
-  virtual void followEefTrajectory(const Trajectory3d&) = 0;
+  virtual void followEefTrajectory(const Traj3dSp&) = 0;
 
   virtual void executLeg(const LegTarget&);
   virtual void executJnt(const JntTarget&);
@@ -131,11 +131,11 @@ protected:
   LegTarget          leg_target_;
   JntTarget          jnt_target_;
 
-  Trajectory1d       jnt_traj_target_;
-  Trajectory3d       jnts_traj_target_;
+  Traj1dSp  jnt_traj_target_;
+  Traj3dSp  jnts_traj_target_;
 
-  EefTarget          eef_target_;
-  Trajectory3d       eef_traj_target_;
+  EefTarget eef_target_;
+  Traj3dSp  eef_traj_target_;
 
 private:
   enum TargetType {

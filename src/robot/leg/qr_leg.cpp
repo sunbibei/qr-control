@@ -60,9 +60,9 @@ QrLeg::~QrLeg()  {
   topology_ = nullptr;
 }
 
-void QrLeg::followJntTrajectory(JntType jnt, const Trajectory1d& _traj)  {
+void QrLeg::followJntTrajectory(JntType jnt, const Traj1dSp& _traj)  {
   const auto& _jnt_poss = joint_position_const_ref();
-  const auto& _jnt_vels = joint_velocity_const_ref();
+  // const auto& _jnt_vels = joint_velocity_const_ref();
   // const auto& _jnt_cmds = joint_command_ref();
 
   // Just for debug
@@ -76,11 +76,11 @@ void QrLeg::followJntTrajectory(JntType jnt, const Trajectory1d& _traj)  {
   }
 }
 
-void QrLeg::followJntTrajectory(const Trajectory3d&) {
+void QrLeg::followJntTrajectory(const Traj3dSp&) {
   LOG_ERROR << "Call the 'followJntTrajectory' which has does not complemented.";
 }
 
-void QrLeg::followEefTrajectory(const Trajectory3d&)
+void QrLeg::followEefTrajectory(const Traj3dSp&)
 {
   LOG_ERROR << "Call the 'followJntTrajectory' which has does not complemented.";
 }
@@ -165,7 +165,7 @@ bool QrLeg::getJacobMatrix(const EV3& a, EM3& JacobMatrix, EM3& inverseJacobMatr
 EV3 QrLeg::jointVelToFoot(const EV3& joint_pos, const EV3& joint_vel)
 { 
   EM3 JacobMatrix, inverseJacobMatrix;
-  bool invertible = getJacobMatrix(joint_pos, JacobMatrix, inverseJacobMatrix);
+  /*bool invertible = */getJacobMatrix(joint_pos, JacobMatrix, inverseJacobMatrix);
   return JacobMatrix * joint_vel;
 }
 
@@ -210,11 +210,11 @@ Formula:
    Py = L0 * S0 + L1 * S0 * C1 + L2 * S0 * C12;
    Pz = - Lo * C0 - L1 * C0 * C1 - L2 * C0 * C12;
 */
-void QrLeg::forwardKinematics(Eigen::Vector3d& xyz, Eigen::Quaterniond&) {
+void QrLeg::fk(Eigen::Vector3d& xyz, Eigen::Quaterniond&) {
   LOG_ERROR << "Call the 'forwardKinematics' which has does not complemented.";
 }
 
-void QrLeg::forwardKinematics(Eigen::Vector3d& xyz) {
+void QrLeg::fk(Eigen::Vector3d& xyz) {
   // TODO WSR is as follow
   // xyz.x() = -topology_->L1() * sin(hip())
   //     - topology_->L2() * sin(hip() + knee());
@@ -228,7 +228,7 @@ void QrLeg::forwardKinematics(Eigen::Vector3d& xyz) {
       - topology_->L2() * cos(yaw()) * cos(hip() + knee());
 }
 
-void QrLeg::forwardKinematics(Eigen::Quaterniond&) {
+void QrLeg::fk(Eigen::Quaterniond&) {
   LOG_ERROR << "Call the 'forwardKinematics' which has does not complemented.";
 }
 /*
@@ -239,7 +239,7 @@ Formula:
    Theta_2 = sgn * acos((Delte^2 + Epsilon^2 - L1^2 - L2^2) / 2 / L1 / L2);
    Meantime, Delte = Px ; Phi = Delte + L2 * S2; Epsilon = L0 + Pz * C0 - Py * S0;
 */
-void QrLeg::inverseKinematics(const Eigen::Vector3d& xyz, Eigen::VectorXd& jnts) {
+void QrLeg::ik(const Eigen::Vector3d& xyz, Eigen::VectorXd& jnts) {
   if (JntType::N_JNTS != jnts.size())
     jnts.resize(JntType::N_JNTS);
 
@@ -260,11 +260,11 @@ void QrLeg::inverseKinematics(const Eigen::Vector3d& xyz, Eigen::VectorXd& jnts)
       - Phi * (topology_->L2() * sin(jnts(JntType::KNEE)) - Delte))) / Phi);
 }
 
-void QrLeg::inverseKinematics(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) {
+void QrLeg::ik(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) {
   LOG_ERROR << "Call the 'inverseKinematics' which has does not complemented.";
 }
 
-void QrLeg::inverseKinematics(const Eigen::Quaterniond&, EVX& angle) {
+void QrLeg::ik(const Eigen::Quaterniond&, EVX& angle) {
   LOG_ERROR << "Call the 'inverseKinematics' which has does not complemented.";
 }
 

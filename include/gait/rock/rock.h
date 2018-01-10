@@ -20,7 +20,7 @@ enum RockState {
 class Rock: public GaitBase {
 public:
 	Rock();
-	virtual bool init() override;
+	// virtual bool init() override;
 
 	virtual ~Rock();
 
@@ -29,13 +29,13 @@ protected:
 	StateMachine<RockState>* state_machine_;
 
 protected:
-	virtual bool starting() override;
-	virtual void stopping() override;
-
-	virtual void checkState() override;
-	// virtual S
-	virtual void prev_tick() override;
-	virtual void post_tick() override;
+//	virtual bool starting() override;
+//	virtual void stopping() override;
+//
+//	virtual void checkState() override;
+//	// virtual S
+//	virtual void prev_tick() override;
+//	virtual void post_tick() override;
 
 protected:
 	class QrLeg*  leg_ifaces_[LegType::N_LEGS];

@@ -5,9 +5,14 @@
  *      Author: bibei
  */
 
+// #ifdef XXX
+
 #include "gait/walk/walk.h"
 #include "robot/leg/qr_leg.h"
 #include "robot/body/qr_body.h"
+#include "adt/segmented.h"
+#include "adt/polynomial.h"
+
 
 #include <toolbox/time_control.h>
 #include <foundation/cfg_reader.h>
@@ -166,6 +171,10 @@ Walk::Walk()
 }
 
 Walk::~Walk() {
+#ifdef RECORDER_EEF_TRAJ
+  eefs_traj_recorder_.save("/home/bibei/Workspaces/matlab/trajs.csv");
+#endif
+
 #ifdef PUB_ROS_TOPIC
   nh_.reset();
   cmd_pub_.reset();
@@ -251,9 +260,9 @@ bool Walk::starting() {
 #endif
 
   timer_    = new TimeControl;
-  eef_traj_ = new SegTrajectory3d;
+  eef_traj_.reset(new SegTraj3d);
   for (auto& t : cog2eef_traj_)
-    t = new Trajectory3d;
+    t.reset(new PolyTraj3d);
 
   LOG_INFO << "The walk gait has STARTED!";
   return true;
@@ -261,12 +270,9 @@ bool Walk::starting() {
 
 void Walk::stopping() {
   for (auto& t : cog2eef_traj_) {
-    delete t;
-    t = nullptr;
+    t.reset();
   }
-
-  delete eef_traj_;
-  eef_traj_ = nullptr;
+  eef_traj_.reset();
 
   delete timer_;
   timer_ = nullptr;
@@ -288,7 +294,7 @@ void Walk::checkState() {
     if (!timer_->running()) {
       Eigen::Vector3d _tmp(0, 0, -params_->STANCE_HEIGHT);
       FOR_EACH_LEG(l) {
-        leg_ifaces_[l]->inverseKinematics(_tmp, leg_cmds_[l]->target);
+        leg_ifaces_[l]->ik(_tmp, leg_cmds_[l]->target);
       }
 
       timer_->start();
@@ -374,7 +380,7 @@ void Walk::checkState() {
     } else
       current_state_ = WalkState::WK_SWING;
     ///! clear the old trajectory.
-    eef_traj_->reset();
+    eef_traj_.reset();
     ///! program the next swing leg
     swing_leg_ = next_leg(swing_leg_);
     break;
@@ -396,8 +402,7 @@ void Walk::checkState() {
 
     Eigen::Vector3d _fpt = eef_traj_->sample(1);
     _fpt.z() -= 0.1*params_->SWING_HEIGHT;
-    leg_ifaces_[swing_leg_]->inverseKinematics(
-        _fpt, leg_cmds_[swing_leg_]->target);
+    leg_ifaces_[swing_leg_]->ik(_fpt, leg_cmds_[swing_leg_]->target);
 
     ///! Every twice swing leg then adjusting COG.
     if ((LegType::FL == swing_leg_) || (LegType::FR == swing_leg_)) {
@@ -446,7 +451,7 @@ void Walk::post_tick() {
   if (_s_sum_interval < post_tick_interval_) return;
   _s_sum_interval = 0;
 
-  for (const auto& leg : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
+  FOR_EACH_LEG(leg) {
     leg_ifaces_[leg]->legTarget(*leg_cmds_[leg]);
     leg_ifaces_[leg]->move();
   }
@@ -455,6 +460,19 @@ void Walk::post_tick() {
 //    __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
 //  } else
     PRINT_POSS_VS_TARGET// PRINT_COMMAND
+
+#ifdef RECORDER_EEF_TRAJ
+    Discrete<double, 14>::StateVec vec;
+    int idx = 0;
+    FOR_EACH_LEG(l) {
+      vec.head(idx + 3).tail(3) = leg_ifaces_[l]->eef();
+      idx += 3;
+    }
+    vec(idx++) = swing_leg_;
+    vec(idx++)   = current_state_;
+    eefs_traj_recorder_.push_back(_s_post_tick.span()/1000.0, vec);
+#endif
+
 
 #ifdef PUB_ROS_TOPIC
   if(cmd_pub_->trylock()) {
@@ -509,7 +527,7 @@ void Walk::move_cog() {
     return;
 
   FOR_EACH_LEG(l) {
-    leg_ifaces_[l]->inverseKinematics(
+    leg_ifaces_[l]->ik(
         cog2eef_traj_[l]->sample((double)timer_->span()/params_->COG_TIME),
         leg_cmds_[l]->target);
   }
@@ -525,7 +543,7 @@ void Walk::swing_leg() {
 
 //  auto diff = (eef_traj_->sample(eef_traj_->ceiling()) - leg_ifaces_[swing_leg_]->eef()).norm();
 //  if (diff > 0.1) {
-    leg_ifaces_[swing_leg_]->inverseKinematics(
+    leg_ifaces_[swing_leg_]->ik(
         eef_traj_->sample(timer_->span()/1000.0), leg_cmds_[swing_leg_]->target);
 //  } else {
 //    close_to_floor();
@@ -546,7 +564,7 @@ void Walk::close_to_floor() {
       ctf_eef_[LEGTYPE_DL(swing_leg_)].z() = std::min(ctf_eef_[LEGTYPE_DL(swing_leg_)].z(), ctf_eef_[swing_leg_].z());
       ctf_eef_[swing_leg_].z()             = ctf_eef_[LEGTYPE_DL(swing_leg_)].z();
       ///! setting the DL command
-      leg_ifaces_[LEGTYPE_DL(swing_leg_)]->inverseKinematics(
+      leg_ifaces_[LEGTYPE_DL(swing_leg_)]->ik(
           ctf_eef_[LEGTYPE_DL(swing_leg_)], leg_cmds_[LEGTYPE_DL(swing_leg_)]->target);
       LOG_INFO << "Setting DL target: " << ctf_eef_[swing_leg_].z();
     } else
@@ -557,7 +575,7 @@ void Walk::close_to_floor() {
   }
   // LOG_WARNING << "close to floor";
   ///! setting command.
-  leg_ifaces_[swing_leg_]->inverseKinematics(
+  leg_ifaces_[swing_leg_]->ik(
       ctf_eef_[swing_leg_], leg_cmds_[swing_leg_]->target);
 }
 
@@ -615,6 +633,7 @@ void Walk::prog_eef_traj() {
       (_rise_fpt.y()/2 + _appr_fpt.y()/2),
       (_last_fpt.z() + params_->SWING_HEIGHT));
 
+  SegTraj3dSp swing_traj(new SegTraj3d);
   double _t0 = 0;
   double _t1 = _t0 + params_->SWING_RISE;
   double _t3 = _t1 + params_->SWING_APPROACH;
@@ -657,7 +676,8 @@ void Walk::prog_eef_traj() {
     x = A.partialPivLu().solve(b);
   }
 
-  Trajectory3d rise_traj(x.transpose());
+  PolyTraj3dSp rise_traj(new PolyTraj3d(x.transpose()));
+  rise_traj->range(_t0, _t1);
   ///////////////////////////////////////////////////////////
   ///! THE DROP PHASE
   ///!  D = a0 + a1 *t + a2 * t^2 + a3 * t^3
@@ -690,7 +710,8 @@ void Walk::prog_eef_traj() {
     x = A.partialPivLu().solve(b);
   }
 
-  Trajectory3d drop_traj(x.transpose());
+  PolyTraj3dSp drop_traj(new PolyTraj3d(x.transpose()));
+  drop_traj->range(_t3, _t4);
   ///////////////////////////////////////////////////////////
   ///! THE APPROACH PHASE
   ///!  A = a0 + a1 *t + a2 * t^2 + a3 * t^3 + a4 * t^4 + a5 * t^5 + a6 * t^6
@@ -705,14 +726,14 @@ void Walk::prog_eef_traj() {
   b.row(0)    = _rise_fpt;
   ///! A'(t1) = R'(t1)
   A.row(1)    = __get_diff_vec(_t1, 7);
-  b.row(1)    = rise_traj.differential(_t1);
+  b.row(1)    = rise_traj->differential(_t1);
   ///! A''(t1) = R''(t1)
   Eigen::VectorXd _ddif_7th_coef;
   _ddif_7th_coef.resize(5);
   _ddif_7th_coef << (2*1), (3*2), (4*3), (5*4), (6*5);
   row         = __get_state_vec(_t1, 5);
   A.row(2).head(2).fill(0.0); A.row(2).tail(5) = _ddif_7th_coef.cwiseProduct(row);
-  b.row(2)    = rise_traj.differential().differential(_t1);
+  b.row(2)    = rise_traj->differential()->differential(_t1);
   ///! A(t2) = p2
   A.row(3) = __get_state_vec(_t2, 7);
   b.row(3) = _top_fpt;
@@ -721,11 +742,11 @@ void Walk::prog_eef_traj() {
   b.row(4) = _appr_fpt;
   ///! A'(t3) = D'(t3)
   A.row(5) = __get_diff_vec(_t3, 7);
-  b.row(5) = drop_traj.differential(_t3);
+  b.row(5) = drop_traj->differential(_t3);
   ///! A''(t3) = D''(t3)
   row      = __get_state_vec(_t3, 5);
   A.row(6).head(2).fill(0.0); A.row(6).tail(5) = _ddif_7th_coef.cwiseProduct(row);
-  b.row(6) = drop_traj.differential().differential(_t3);
+  b.row(6) = drop_traj->differential()->differential(_t3);
 
 //  std::cout << "appr - A:\n" << A << std::endl;
 //  std::cout << "appr - b:\n" << b << std::endl;
@@ -736,12 +757,18 @@ void Walk::prog_eef_traj() {
     x = A.partialPivLu().solve(b);
   }
 
-  Trajectory3d appr_traj(x.transpose());
+  PolyTraj3dSp appr_traj(new PolyTraj3d(x.transpose()));
+  appr_traj->range(_t1, _t3);
 
-  eef_traj_->add(rise_traj, _t0, _t1);
-  eef_traj_->add(appr_traj, _t1, _t3);
-  eef_traj_->add(drop_traj, _t3, _t4);
-  std::cout << "Trajectory:\n" << *eef_traj_ << std::endl;
+  swing_traj->add(rise_traj, _t0, _t1);
+  swing_traj->add(appr_traj, _t1, _t3);
+  swing_traj->add(drop_traj, _t3, _t4);
+  eef_traj_ = swing_traj;
+  ///! Just for debug information
+  std::cout << "Swing Trajectory: " << std::endl;
+  std::cout << " - Rise phase: " << *rise_traj << std::endl;
+  std::cout << " - Appr phase: " << *appr_traj << std::endl;
+  std::cout << " - Drop phase: " << *drop_traj << std::endl;
 }
 
 Eigen::Vector3d Walk::prog_next_fpt(LegType _fsl) {
@@ -798,9 +825,11 @@ void Walk::prog_cog_traj() {
       c = A.partialPivLu().solve(b);
     }
 
+    cog2eef_traj_[l].reset(new PolyTraj3d(c.transpose()));
     cog2eef_traj_[l]->range(0, 1);
-    cog2eef_traj_[l]->reset(c.transpose());
-    std::cout << *cog2eef_traj_[l] << std::endl;
+
+    ///! Just for debug information
+    std::cout << *(boost::dynamic_pointer_cast<PolyTraj3d>(cog2eef_traj_[l])) << std::endl;
   }
 }
 

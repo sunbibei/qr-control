@@ -305,7 +305,7 @@ void TestTraj::print() {
     printf("\n\n\n\033[37;1m");
     for (int i = 0; i < total; ++i) {
       printf("%s of %s(%03d/%03d): ", cmds[2].c_str(), cmds[1].c_str(), i+1, total);
-      for (int j = 0; j < data.size(); ++j)
+      for (size_t j = 0; j < data.size(); ++j)
         printf("%+01.04f ", data[j]);
       printf("\n");
       double period = 0.5;
@@ -390,14 +390,14 @@ void TestTraj::command() {
 }
 
 void TestTraj::traj() {
-  Trajectory1d _traj;
-  _traj << 1.5350,   -1.3112,   -0.3450,   -0.4617;
-  std::cout << _traj << std::endl;
-
-  leg_ifaces_[LegType::HL]->jointTrajectoryTarget(JntType::HIP, _traj);
-  leg_ifaces_[LegType::HL]->move();
-
-  current_state_ = TestTrajState::STATE_INIT;
+//  Trajectory1d _traj;
+//  _traj << 1.5350,   -1.3112,   -0.3450,   -0.4617;
+//  std::cout << _traj << std::endl;
+//
+//  leg_ifaces_[LegType::HL]->jointTrajectoryTarget(JntType::HIP, _traj);
+//  leg_ifaces_[LegType::HL]->move();
+//
+//  current_state_ = TestTrajState::STATE_INIT;
 }
 
 void TestTraj::spec_code() {

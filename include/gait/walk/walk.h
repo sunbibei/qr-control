@@ -9,11 +9,18 @@
 #define INCLUDE_GAIT_WALK_WALK_H_
 
 #include "gait/gait_base.h"
-#include "adt/seg_trajectory.h"
+#include "adt/trajectory.h"
 
 #include <Eigen/Dense>
 
+///! whether the colored output the joint position.
 #define DIS_JNT_LIMIT
+///! whether record the EEF trajectory
+#define RECORDER_EEF_TRAJ
+#ifdef  RECORDER_EEF_TRAJ
+#include "adt/discrete.h"
+#endif
+
 #define PUB_ROS_TOPIC
 #ifdef PUB_ROS_TOPIC
 #include <ros/ros.h>
@@ -155,9 +162,9 @@ protected:
   TimeControl*     timer_;
 
   ///! The trajectory for swing leg
-  SegTrajectory3d* eef_traj_;
+  Traj3dSp         eef_traj_;
   ///! The trajectory for moving COG
-  Trajectory3d*    cog2eef_traj_[LegType::N_LEGS];
+  Traj3dSp         cog2eef_traj_[LegType::N_LEGS];
 
   ///! The following swing leg, it indicates the following swing leg at any time.
   LegType          swing_leg_;
@@ -174,6 +181,10 @@ protected:
 private:
   ///! save the last close_to_floor eef target
   Eigen::Vector3d ctf_eef_[LegType::N_LEGS];
+#ifdef RECORDER_EEF_TRAJ
+  ///! record the EEF trajectory.
+  Discrete<double, 14> eefs_traj_recorder_;
+#endif
 //  Eigen::Vector2d cog_proj1();
 //  ///! The last position of swing leg
 //  Eigen::Vector3d last_foot_pos1_;

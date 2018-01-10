@@ -13,7 +13,11 @@
 namespace qr_control {
 namespace internal {
 
-
+/*!
+ * @brief The comma initializer. Useage:
+ *        _Obj << 1, 2, 4, ...;
+ *        NOTE: Need the Object has a method named reset(MiiVector<_DataType>);
+ */
 template<typename _Obj, typename _DataType>
 class CommaInitializer {
 public:
@@ -24,7 +28,8 @@ public:
   virtual ~CommaInitializer() {
     if (init_vec_.empty()) return;
 
-    inst_obj_ = _Obj(init_vec_);
+    inst_obj_.reset(init_vec_);
+    // inst_obj_ = _Obj(init_vec_);
     init_vec_.clear();
   }
 

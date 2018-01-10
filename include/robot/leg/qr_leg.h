@@ -23,9 +23,9 @@ public:
 
 ///! inherit from RobotLeg
 protected:
-  virtual void followJntTrajectory(JntType, const Trajectory1d&) override;
-  virtual void followJntTrajectory(const Trajectory3d&) override;
-  virtual void followEefTrajectory(const Trajectory3d&) override;
+  virtual void followJntTrajectory(JntType, const Traj1dSp&) override;
+  virtual void followJntTrajectory(const Traj3dSp&) override;
+  virtual void followEefTrajectory(const Traj3dSp&) override;
 
 // inherit from MathLeg
 public:
@@ -40,9 +40,9 @@ public:
    * @param translation [out]  The current translation from the base frame.
    * @param quaternion  [out]  The current quaternion related to the base frame.
    */
-  virtual void forwardKinematics(Eigen::Vector3d&, Eigen::Quaterniond&) override;
-  virtual void forwardKinematics(Eigen::Quaterniond&) override;
-  virtual void forwardKinematics(Eigen::Vector3d&)    override;
+  virtual void fk(Eigen::Vector3d&, Eigen::Quaterniond&) override;
+  virtual void fk(Eigen::Quaterniond&) override;
+  virtual void fk(Eigen::Vector3d&)    override;
   /*!
    * @brief The inverse kinematic solution, given the target of foot pose.
    * @param translation [in]  The target of the translation from the base frame.
@@ -51,9 +51,9 @@ public:
    * @return Return true, if everything is OK, or return false.
    */
   // virtual void inverseKinematics(const EVX& jnt_pos, EVX& angle) override;
-  virtual void inverseKinematics(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) override;
-  virtual void inverseKinematics(const Eigen::Vector3d&,   EVX& angle)  override;
-  virtual void inverseKinematics(const Eigen::Quaterniond&, EVX& angle) override;
+  virtual void ik(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) override;
+  virtual void ik(const Eigen::Vector3d&,   EVX& angle)  override;
+  virtual void ik(const Eigen::Quaterniond&, EVX& angle) override;
 
 ///! Offer some convenient interfaces for user.
 public:

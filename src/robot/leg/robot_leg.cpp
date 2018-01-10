@@ -80,11 +80,11 @@ void RobotLeg::executJnt(const JntTarget& p) {
 void RobotLeg::executEef(const EefTarget& p) {
   EVX _jnt_pos;
   if (TargetType::EEF_XYZ == curr_target_) {
-    inverseKinematics(p.xyz, _jnt_pos);
+    ik(p.xyz, _jnt_pos);
   } else if (TargetType::EEF_RPY  == curr_target_) {
-    inverseKinematics(p.rpy, _jnt_pos);;
+    ik(p.rpy, _jnt_pos);;
   } else if (TargetType::EEF_POSE == curr_target_) {
-    inverseKinematics(p.xyz, p.rpy, _jnt_pos);;
+    ik(p.xyz, p.rpy, _jnt_pos);;
   } else {
     LOG_ERROR << "What fucking code!";
   }
@@ -94,14 +94,14 @@ void RobotLeg::executEef(const EefTarget& p) {
 
 void RobotLeg::executEef(const Eigen::Vector3d& xyz) {
   EVX _jnt_pos;
-  inverseKinematics(xyz, _jnt_pos);
+  ik(xyz, _jnt_pos);
 
   joint_command(_jnt_pos);
 }
 
 void RobotLeg::executEef(const Eigen::Quaterniond& rpy) {
   EVX _jnt_pos;
-  inverseKinematics(rpy, _jnt_pos);
+  ik(rpy, _jnt_pos);
 
   joint_command(_jnt_pos);
 }
@@ -130,13 +130,13 @@ void RobotLeg::jointTarget(JntType jnt_type, JntCmdType jnt_cmd_type, double tar
   curr_target_             = TargetType::JNT_CMD;
 }
 
-void RobotLeg::jointTrajectoryTarget(JntType _t, const Trajectory1d& _traj) {
+void RobotLeg::jointTrajectoryTarget(JntType _t, const Traj1dSp& _traj) {
   curr_target_jnt_for_traj_ = _t;
   jnt_traj_target_          = _traj;
   curr_target_              = TargetType::JNT_TRAJ;
 }
 
-void RobotLeg::jointTrajectoryTarget(const Trajectory3d& _traj) {
+void RobotLeg::jointTrajectoryTarget(const Traj3dSp& _traj) {
   curr_target_jnt_for_traj_  = JntType::N_JNTS;
   jnts_traj_target_          = _traj;
   curr_target_               = TargetType::JNT_TRAJ;
@@ -157,47 +157,47 @@ void RobotLeg::eefTarget(const EefTarget& t) {
   curr_target_ = TargetType::EEF_POSE;
 }
 
-void RobotLeg::eefTrajectoryTarget(const Trajectory3d& t) {
+void RobotLeg::eefTrajectoryTarget(const Traj3dSp& t) {
   eef_traj_target_ = t;
   curr_target_     = TargetType::EEF_TRAJ;
 }
 
 ///! getter methods
-const JntTarget& RobotLeg::jointTarget() {
-  return jnt_target_;
-}
-
-const Trajectory1d&   RobotLeg::jointTrajectoryTarget() {
-  return jnt_traj_target_;
-}
-
-const Eigen::Quaterniond& RobotLeg::eefOrientationTarget() {
-  return eef_target_.rpy;
-}
-
-const EV3&    RobotLeg::eefPositionTarget() {
-  return eef_target_.xyz;
-}
-
-const Trajectory3d&   RobotLeg::eefTrajectoryTarget() {
-  return eef_traj_target_;
-}
+//const JntTarget& RobotLeg::jointTarget() {
+//  return jnt_target_;
+//}
+//
+//const Trajectory1d&   RobotLeg::jointTrajectoryTarget() {
+//  return (*jnt_traj_target_);
+//}
+//
+//const Eigen::Quaterniond& RobotLeg::eefOrientationTarget() {
+//  return eef_target_.rpy;
+//}
+//
+//const EV3&    RobotLeg::eefPositionTarget() {
+//  return eef_target_.xyz;
+//}
+//
+//const Trajectory3d&   RobotLeg::eefTrajectoryTarget() {
+//  return *eef_traj_target_;
+//}
 
 void RobotLeg:: eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy) {
-  forwardKinematics(_xyz, _rpy);
+  fk(_xyz, _rpy);
 }
 
 void RobotLeg::eef(Eigen::Vector3d& _xyz) {
-  forwardKinematics(_xyz);
+  fk(_xyz);
 }
 
 void RobotLeg::eef(Eigen::Quaterniond& _rpy) {
-  forwardKinematics(_rpy);
+  fk(_rpy);
 }
 
 Eigen::Vector3d RobotLeg::eef() {
   Eigen::Vector3d _xyz;
-  forwardKinematics(_xyz);
+  fk(_xyz);
   return _xyz;
 }
 
