@@ -52,6 +52,8 @@ set(ROBOT_FILES       ${SRC_RO_LEG_ROOT}/data_leg.cpp
                       ${SRC_RO_BOFY_ROOT}/math_body.cpp
                       ${SRC_RO_BOFY_ROOT}/qr_body.cpp
                       ${SRC_RO_BOFY_ROOT}/robot_body.cpp
+                      ${SRC_ROBOT_ROOT}/leg_robot.cpp
+                      ${SRC_ROBOT_ROOT}/qr_robot.cpp
 )
 
 set(CTRL_FILES        ${SRC_ROOT}/mii_control.cpp

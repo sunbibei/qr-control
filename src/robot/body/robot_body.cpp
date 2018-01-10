@@ -6,10 +6,10 @@
  */
 
 #include <robot/body/robot_body.h>
-
+#ifdef XXX
 namespace qr_control {
 
-#ifdef XXX
+
 
 #define G (9.8)
 

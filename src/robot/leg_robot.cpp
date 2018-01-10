@@ -13,6 +13,8 @@ namespace qr_control {
 
 LegRobot::LegRobot(const MiiString& _tag)
   : body_iface_(nullptr) {
+  for (auto& l : leg_ifaces_)
+    l = nullptr;
   auto cfg = MiiCfgReader::instance();
   MiiVector<MiiString> labels;
   cfg->get_value_fatal(_tag, "legs", labels);
@@ -33,7 +35,7 @@ LegRobot::LegRobot(const MiiString& _tag)
   if (nullptr == iface) {
     LOG_ERROR << "Could not find the interface of leg labeled '"
         << label << "'.";
-    continue;
+    return;
   }
 
   body_iface_ = iface;
