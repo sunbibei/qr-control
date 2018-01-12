@@ -20,13 +20,8 @@ namespace geometry {
 ///! The convenient alias.
 using Point2d = Eigen::Vector2d;
 using Point3d = Eigen::Vector3d;
-
 ///! ax + by + c = 0;
-typedef struct {
-  double a;
-  double b;
-  double c;
-} Linear;
+using Linear  = Eigen::Vector3d;
 
 ///////////////////////////////////////////////////////////////////////////////
 ////////////           The helper methods of 2-D plane             ////////////
@@ -40,6 +35,8 @@ Linear  linear(const Point2d& a, const Point2d& b);
 Point2d cross_point(const Linear& l1, const Linear& l2);
 ///! the distance between the point p to the linear l.
 double  distance(const Linear& l, const Point2d& p);
+///! the angle between Linear l1 and l2.
+double  angle(const Linear& l1, const Linear& l2);
 
 ///! the area of triangle.
 double  area_of_triangle        (const Point2d& a, const Point2d& b, const Point2d& c);
