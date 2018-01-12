@@ -18,10 +18,8 @@ namespace qr_control {
  *        may be it will be fill some methods.
  */
 class RobotBody: public MathBody {
-	;
-//public:
-//  RobotBody();
-//  // virtual bool init() override;
+public:
+  virtual bool init() override;
 //  virtual ~RobotBody();
 //
 };

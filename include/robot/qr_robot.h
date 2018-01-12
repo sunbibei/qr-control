@@ -8,14 +8,14 @@
 #ifndef INCLUDE_ROBOT_QR_ROBOT_H_
 #define INCLUDE_ROBOT_QR_ROBOT_H_
 
-#include <foundation/utf.h>
+// #include <foundation/utf.h>
 
 #include <robot/leg_robot.h>
 
 namespace qr_control {
 
 class QrRobot: public LegRobot {
-  SINGLETON_DECLARE(QrRobot, const MiiString&)
+SINGLETON_DECLARE(QrRobot)
 
 ///! inherit from LegRobot
 public:

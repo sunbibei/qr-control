@@ -6,6 +6,20 @@
  */
 
 #include <robot/body/robot_body.h>
+#include <robot/leg_robot.h>
+
+namespace qr_control {
+
+bool RobotBody::init() {
+  if (!MathBody::init()) return false;
+
+  LegRobot::instance()->body_iface_ = this;
+  return true;
+}
+
+}
+
+
 #ifdef XXX
 namespace qr_control {
 

@@ -32,6 +32,7 @@ struct EefTarget {
 class RobotLeg: public MathLeg {
 public:
   RobotLeg();
+  virtual bool init() override;
   virtual ~RobotLeg();
 
 ///! The status of robot-leg of getter

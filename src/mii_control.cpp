@@ -10,6 +10,7 @@
 #include <foundation/thread/threadpool.h>
 
 #include "mii_control.h"
+#include "robot/qr_robot.h"
 #include "gait/gait_manager.h"
 
 #include <thread>
@@ -81,6 +82,8 @@ void MiiControl::activate(const MiiString& _n) {
 void MiiControl::create_system_instance() {
   if (nullptr == GaitManager::create_instance())
     LOG_FATAL << "Create the singleton 'GaitManager' has failed.";
+  if (nullptr == QrRobot::create_instance())
+    LOG_FATAL << "Create the singleton 'QrRobot' has failed.";
 }
 
 void MiiControl::tick() {

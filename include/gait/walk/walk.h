@@ -149,9 +149,9 @@ private:
   void close_to_floor();
 protected:
   ///! The interface for body
-  class QrBody*         body_iface_;
+  class RobotBody*      body_iface_;
   ///! The interface for legs
-  class QrLeg*          leg_ifaces_[LegType::N_LEGS];
+  class RobotLeg*       leg_ifaces_[LegType::N_LEGS];
   ///! The commands of legs.
   class LegTarget*      leg_cmds_[LegType::N_LEGS];
   ///! Variables about gait control
