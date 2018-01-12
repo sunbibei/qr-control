@@ -21,12 +21,6 @@
 
 namespace qr_control {
 
-#define JNTS_POS \
-    leg_ifaces_[LegType::FL]->joint_position_const_ref(), \
-    leg_ifaces_[LegType::FR]->joint_position_const_ref(), \
-    leg_ifaces_[LegType::HL]->joint_position_const_ref(), \
-    leg_ifaces_[LegType::HR]->joint_position_const_ref()
-
 #define JNTS_TARGET \
     leg_cmds_[LegType::FL]->target, \
     leg_cmds_[LegType::FR]->target, \
@@ -35,24 +29,9 @@ namespace qr_control {
 
 Eigen::Vector2d __incenter(const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
 
-void __cycloid_position(
-      const Eigen::Vector3d&, const Eigen::Vector3d&, int, int, int, Eigen::Vector3d&);
-
 Eigen::Vector2d __cross_point(
     const Eigen::Vector2d& p0_0, const Eigen::Vector2d& p0_1,
     const Eigen::Vector2d& p1_0, const Eigen::Vector2d& p1_1);
-
-double __inscribed_circle_radius(
-    const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
-
-Eigen::Vector2d __inner_heart(
-    const Eigen::Vector2d&, const Eigen::Vector2d&, const Eigen::Vector2d&);
-
-Eigen::Vector2d __line_section(
-    const Eigen::Vector2d& A, const Eigen::Vector2d& B, double ratio);
-
-// LegType __same_side(LegType _c);
-//LegType __ipsilateral(LegType _c);
 
 struct WalkParam {
   ///! The threshold for cog
@@ -782,12 +761,10 @@ void Walk::prog_cog_traj() {
 Eigen::Vector2d Walk::prog_next_cog(LegType _fsl) {
   Eigen::Vector2d _next_cog_proj(0.0, 0.0), _p[3];
   Eigen::Vector2d _last_cog_proj(0.0, 0.0), _lwp[LegType::N_LEGS];
-  LegType _next_leg = _fsl;
-  _last_cog_proj    = body_iface_->cog().head(2);
-
+  _last_cog_proj = body_iface_->cog().head(2);
 
   FOR_EACH_LEG(l) {
-    if (l != _next_leg)
+    if (l != _fsl)
       _lwp[l] = (leg_ifaces_[l]->eef() + body_iface_->leg_base(l)).head(2);
     else
       _lwp[l] = (prog_next_fpt(_fsl).head(2) + body_iface_->leg_base(l).head(2));
@@ -795,9 +772,7 @@ Eigen::Vector2d Walk::prog_next_cog(LegType _fsl) {
   _p[0] = __cross_point(_lwp[LegType::FL], _lwp[LegType::HR],
       _lwp[LegType::FR], _lwp[LegType::HL]);
 
-
-  // _p[0] = body_iface_->cog().head(2);
-  if ((LegType::FL == _next_leg) || (LegType::HL == _next_leg)) {
+  if ((LegType::FL == _fsl) || (LegType::HL == _fsl)) {
     _p[1] = (leg_ifaces_[LegType::FR]->eef() + body_iface_->leg_base(LegType::FR)).head(2);
     _p[2] = (leg_ifaces_[LegType::HR]->eef() + body_iface_->leg_base(LegType::HR)).head(2);
   } else {
@@ -809,7 +784,7 @@ Eigen::Vector2d Walk::prog_next_cog(LegType _fsl) {
 
   int idx = 0;
   FOR_EACH_LEG(l) {
-    if (l == _next_leg) continue;
+    if (l == _fsl) continue;
     _p[idx++] = (leg_ifaces_[l]->eef()
         + body_iface_->leg_base(l)).head(2);
   }
@@ -1044,32 +1019,6 @@ Eigen::Vector2d __incenter(
       (a*A.x() + b*B.x() + c*C.x())/sum,(a*A.y() + b*B.y() + c*C.y())/sum);
 }
 
-/*!
- * @brief This methods calculate the next target position through the start
- *        point _p0, end point _p1, the current/total count(t/T), the brachyaxis
- *        of cycloid(b), the result save to _p. The formula as follow:
- *              | x |   | l0 * (dt - 0.50/pi*sin(2*pi*dt)) |
- *              | y | = | l1 * (dt - 0.50/pi*sin(2*pi*dt)) |
- *              | z |   | 2b * (dt - 0.25/pi*sin(4*pi*dt)) |
- *        where L = [l0, l1] = _p1 - _p0, dt = t/T,
- * @param _p0 The start point
- * @param _p1 The end   point
- * @param t   The current count
- * @param T   The total   count
- * @param b   The brachyaxis
- * @param _p  The result point
- */
-void __cycloid_position(
-      const Eigen::Vector3d& _p0, const Eigen::Vector3d& _p1,
-      int t, int T, int b, Eigen::Vector3d& _p) {
-  _p(0) = (_p1(0) - _p0(0)) * ((float)t/(float)T - 1.0/2.0/M_PI*sin(2.0*M_PI*t/T));
-  _p(1) = (_p1(1) - _p0(1)) * ((float)t/(float)T - 1.0/2.0/M_PI*sin(2.0*M_PI*t/T));
-  if(t<=T/2)
-    _p(2) = 2.0 * b * ((float)t/(float)T - 1.0/4.0/M_PI*sin(4.0*M_PI*t/T));
-  else if(t<=T)
-    _p(2) = 2.0 * b * ((float)(T-t)/(float)T - 1.0/4.0/M_PI*sin(4.0*M_PI*(T-t)/T));
-}
-
 Eigen::Vector2d __cross_point(
     const Eigen::Vector2d& p0_0, const Eigen::Vector2d& p0_1,
     const Eigen::Vector2d& p1_0, const Eigen::Vector2d& p1_1) {
@@ -1104,48 +1053,6 @@ Eigen::Vector2d __cross_point(
 
   return res;
 }
-
-double __inscribed_circle_radius(
-    const Eigen::Vector2d& A, const Eigen::Vector2d& B, const Eigen::Vector2d& C) {
-  float c = sqrt(pow((A.x()-B.x()),2) + pow((A.y()-B.y()),2));
-  float b = sqrt(pow((A.x()-C.x()),2) + pow((A.y()-C.y()),2));
-  float a = sqrt(pow((C.x()-B.x()),2) + pow((C.y()-B.y()),2));
-  float p = (a+b+c)/2;
-  float s = sqrt(p*(p-a)*(p-b)*(p-c));
-  return 2*s/(a+b+c);
-}
-
-Eigen::Vector2d __inner_heart(
-    const Eigen::Vector2d& A, const Eigen::Vector2d& B, const Eigen::Vector2d& C) {
-  double a = 0, b = 0, c = 0;
-  Eigen::Vector2d heart(0.0, 0.0);
-
-  a = sqrt(pow(B.x() - C.x(), 2) + pow(B.y() - C.y(), 2));
-  b = sqrt(pow(A.x() - C.x(), 2) + pow(A.y() - C.y(), 2));
-  c = sqrt(pow(A.x() - B.x(), 2) + pow(A.y() - B.y(), 2));
-
-  heart.x() = (a * A.x() + b * B.x() + c * C.x() ) / (a + b + c);
-  heart.y() = (a * A.y() + b * B.y() + c * C.y() ) / (a + b + c);
-  return heart;
-}
-
-Eigen::Vector2d __line_section(
-    const Eigen::Vector2d& A, const Eigen::Vector2d& B, double ratio) {
-  Eigen::Vector2d result;
-  result.x() = B.x() - ratio * (B.x() - A.x());
-  result.y() = B.y() - ratio * (B.y() - A.y());
-  return result;
-}
-
-//LegType __same_side(LegType _c) {
-//  switch (_c) {
-//  case LegType::FL: return LegType::FR;
-//  case LegType::FR: return LegType::FL;
-//  case LegType::HL: return LegType::HR;
-//  case LegType::HR: return LegType::HL;
-//  default: return LegType::UNKNOWN_LEG;
-//  }
-//}
 
 } /* namespace qr_control */
 

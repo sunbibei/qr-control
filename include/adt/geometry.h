@@ -41,14 +41,16 @@ Point2d cross_point(const Linear& l1, const Linear& l2);
 ///! the distance between the point p to the linear l.
 double  distance(const Linear& l, const Point2d& p);
 
+///! the area of triangle.
+double  area_of_triangle        (const Point2d& a, const Point2d& b, const Point2d& c);
 ///! the incenter of triangle.
-Point2d incenter_of_triangle(const Point2d& a, const Point2d& b, const Point2d& c);
+Point2d incenter_of_triangle    (const Point2d& a, const Point2d& b, const Point2d& c);
 ///! the orthocentre of triangle
-Point2d orthocentre_of_triangle(const Point2d& a, const Point2d& b, const Point2d& c);
+Point2d orthocentre_of_triangle (const Point2d& a, const Point2d& b, const Point2d& c);
 ///! the circumcentre of triangle
 Point2d circumcentre_of_triangle(const Point2d& a, const Point2d& b, const Point2d& c);
 
-} /* end namespace qr_control */
 } /* end namespace geometry */
+} /* end namespace qr_control */
 
 #endif /* INCLUDE_ADT_GEOMETRY_H_ */
