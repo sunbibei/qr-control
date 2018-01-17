@@ -11,6 +11,7 @@
 #include "robot/qr_robot.h"
 #include "adt/segmented.h"
 #include "adt/polynomial.h"
+#include "adt/geometry.h"
 
 #include <toolbox/time_control.h>
 #include <foundation/cfg_reader.h>
@@ -18,6 +19,8 @@
 #ifdef DIS_JNT_LIMIT
 #include <repository/resource/joint_manager.h>
 #endif
+
+#include <limits>
 
 namespace qr_control {
 
@@ -57,12 +60,15 @@ struct WalkParam {
   double   SWING_APPROACH;
   ///! The time for swing leg in drop phase (in s)
   double   SWING_DROP;
+  ///! The minmum stablity margin could to swing leg.
+  double   MARGIN_THRES;
 
   WalkParam(const MiiString& _tag)
     : THRES_COG(6.5),    FOOT_STEP(10),
       STANCE_HEIGHT(46), SWING_HEIGHT(5),
       FORWARD_ALPHA(0),  STOP_HEIGHT_SCALE(0.3),
-      COG_TIME(2000),    SWING_TIME(2000) {
+      COG_TIME(2000),    SWING_TIME(2000),
+      MARGIN_THRES(6) {
     auto cfg = MiiCfgReader::instance();
     cfg->get_value(_tag, "cog_threshold",THRES_COG);
     cfg->get_value(_tag, "step",         FOOT_STEP);
@@ -77,6 +83,8 @@ struct WalkParam {
     cfg->get_value(_tag, "swing_rise",     SWING_RISE);
     cfg->get_value(_tag, "swing_approach", SWING_APPROACH);
     cfg->get_value(_tag, "swing_drop",     SWING_DROP);
+
+    cfg->get_value(_tag, "margin_threshold", MARGIN_THRES);
   }
 };
 
@@ -103,7 +111,7 @@ Walk::Walk()
 
 Walk::~Walk() {
 #ifdef RECORDER_EEF_TRAJ
-  eefs_traj_recorder_.save("/home/bibei/Workspaces/matlab/trajs.csv");
+  eefs_traj_recorder_.save("/home/bibei/Workspaces/matlab/Trajectory/trajs.csv");
 #endif
 
 #ifdef PUB_ROS_TOPIC
@@ -310,8 +318,6 @@ void Walk::checkState() {
     ///! program the next swing leg
     swing_leg_ = next_leg(swing_leg_);
     break;
-
-    break;
   }
   case WalkState::WK_SWING_1:
   {
@@ -381,6 +387,11 @@ void Walk::post_tick() {
     leg_ifaces_[leg]->legTarget(*leg_cmds_[leg]);
     leg_ifaces_[leg]->move();
   }
+
+  Eigen::Vector3d margins = stability_margin(swing_leg_);
+  std::cout << "cog -> cf-ch:" << margins.x() << std::endl;
+  std::cout << "cog -> il-sl:" << margins.y() << std::endl;
+  std::cout << "cog -> il-dl:" << margins.z() << std::endl;
 
 //  if (current_state_ == WalkState::WK_SWING) {
 //    __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
@@ -459,7 +470,42 @@ void Walk::move_cog() {
 }
 
 bool Walk::end_move_cog() {
-  return (timer_->span() > params_->COG_TIME);
+  ///! FL, FR, HL, HR and stability_margin
+  Eigen::Vector3d margins = stability_margin(swing_leg_);
+
+//  std::cout << "cog -> cf-ch:  " << margins.x() << std::endl;
+//  std::cout << "cog -> il-sl:  " << margins.y() << std::endl;
+//  std::cout << "cog -> il-dl:  " << margins.z() << std::endl;
+
+  return (margins.minCoeff() > params_->MARGIN_THRES);
+}
+
+Eigen::Vector3d Walk::stability_margin(LegType sl) {
+  static Eigen::Vector3d _eefs[LegType::N_LEGS];
+  FOR_EACH_LEG(leg) {
+    _eefs[leg] = leg_ifaces_[leg]->eef() + body_iface_->leg_base(leg);
+  }
+
+  if (!geometry::is_in_triangle(
+      _eefs[LEGTYPE_CF(sl)].head(2), _eefs[LEGTYPE_CH(sl)].head(2),
+      _eefs[LEGTYPE_IL(sl)].head(2), body_iface_->cog().head(2))) {
+    // LOG_WARNING << "NO MOVE!";
+    return Eigen::Vector3d(
+        -std::numeric_limits<double>::infinity(),
+        -std::numeric_limits<double>::infinity(),
+        -std::numeric_limits<double>::infinity());
+  } else {
+    return Eigen::Vector3d(
+        geometry::distance(
+            geometry::linear(_eefs[LEGTYPE_CF(sl)].head(2), _eefs[LEGTYPE_CH(sl)].head(2)),
+            body_iface_->cog().head(2)),
+        geometry::distance(
+            geometry::linear(_eefs[LEGTYPE_IL(sl)].head(2), _eefs[LEGTYPE_SL(sl)].head(2)),
+            body_iface_->cog().head(2)),
+        geometry::distance(
+            geometry::linear(_eefs[LEGTYPE_IL(sl)].head(2), _eefs[LEGTYPE_DL(sl)].head(2)),
+            body_iface_->cog().head(2)));
+  }
 }
 
 void Walk::swing_leg() {
@@ -690,10 +736,10 @@ void Walk::prog_eef_traj() {
   swing_traj->add(drop_traj, _t3, _t4);
   eef_traj_ = swing_traj;
   ///! Just for debug information
-  std::cout << "Swing Trajectory: " << std::endl;
-  std::cout << " - Rise phase: " << *rise_traj << std::endl;
-  std::cout << " - Appr phase: " << *appr_traj << std::endl;
-  std::cout << " - Drop phase: " << *drop_traj << std::endl;
+//  std::cout << "Swing Trajectory: " << std::endl;
+//  std::cout << " - Rise phase: " << *rise_traj << std::endl;
+//  std::cout << " - Appr phase: " << *appr_traj << std::endl;
+//  std::cout << " - Drop phase: " << *drop_traj << std::endl;
 }
 
 Eigen::Vector3d Walk::prog_next_fpt(LegType _fsl) {
@@ -707,10 +753,10 @@ Eigen::Vector3d Walk::prog_next_fpt(LegType _fsl) {
 
   if (std::abs(_other_fpt.x() - _last_fpt.x()) > 0.5*params_->FOOT_STEP) {
     _next_fpt.x() = _other_fpt.x() + params_->FOOT_STEP;
-    _next_fpt.y() = _other_fpt.y();
+    // _next_fpt.y() = _other_fpt.y();
   } else {
     _next_fpt.x() += params_->FOOT_STEP;
-    _next_fpt.y()  = _last_fpt.y() + std::abs(_next_fpt.x() - _last_fpt.x()) * tan(params_->FORWARD_ALPHA);
+    // _next_fpt.y()  = _last_fpt.y() + std::abs(_next_fpt.x() - _last_fpt.x()) * tan(params_->FORWARD_ALPHA);
   }
   _next_fpt.z() = _last_fpt.z()/* + 0.3*params_->SWING_HEIGHT*/;
 
@@ -759,7 +805,7 @@ void Walk::prog_cog_traj() {
 }
 
 Eigen::Vector2d Walk::prog_next_cog(LegType _fsl) {
-  Eigen::Vector2d _next_cog_proj(0.0, 0.0), _p[3];
+//  Eigen::Vector2d _next_cog_proj(0.0, 0.0), _p[3];
   Eigen::Vector2d _last_cog_proj(0.0, 0.0), _lwp[LegType::N_LEGS];
   _last_cog_proj = body_iface_->cog().head(2);
 
@@ -769,27 +815,41 @@ Eigen::Vector2d Walk::prog_next_cog(LegType _fsl) {
     else
       _lwp[l] = (prog_next_fpt(_fsl).head(2) + body_iface_->leg_base(l).head(2));
   }
-  _p[0] = __cross_point(_lwp[LegType::FL], _lwp[LegType::HR],
-      _lwp[LegType::FR], _lwp[LegType::HL]);
+  auto _cs = geometry::cross_point(
+      geometry::linear(_lwp[LegType::FL], _lwp[LegType::HR]),
+      geometry::linear(_lwp[LegType::FR], _lwp[LegType::HL]));
+  auto _next_cog_proj = geometry::incenter_of_triangle(_cs, _lwp[LEGTYPE_CF(_fsl)], _lwp[LEGTYPE_CH(_fsl)]);
 
-  if ((LegType::FL == _fsl) || (LegType::HL == _fsl)) {
-    _p[1] = (leg_ifaces_[LegType::FR]->eef() + body_iface_->leg_base(LegType::FR)).head(2);
-    _p[2] = (leg_ifaces_[LegType::HR]->eef() + body_iface_->leg_base(LegType::HR)).head(2);
-  } else {
-    _p[1] = (leg_ifaces_[LegType::FL]->eef() + body_iface_->leg_base(LegType::FL)).head(2);
-    _p[2] = (leg_ifaces_[LegType::HL]->eef() + body_iface_->leg_base(LegType::HL)).head(2);
-  }
-  _next_cog_proj = __incenter(_p[0], _p[1], _p[2]);
+//  std::cout << "fl-hr: " << _lwp[LegType::FL].transpose() << "; " << _lwp[LegType::HR].transpose() << std::endl;
+//  std::cout << "fl-hr: " << geometry::linear(_lwp[LegType::FL], _lwp[LegType::HR]).transpose() << std::endl;
+//  std::cout << "fr-hl: " << _lwp[LegType::FR].transpose() << "; " << _lwp[LegType::HL].transpose() << std::endl;
+//  std::cout << "fr-hl: " << geometry::linear(_lwp[LegType::FR], _lwp[LegType::HL]).transpose() << std::endl;
+//  std::cout << "cs:    " << _cs.transpose() << std::endl;
+//  std::cout << "cog:   " << _next_cog_proj  << std::endl;
+
   return _next_cog_proj;
-
-  int idx = 0;
-  FOR_EACH_LEG(l) {
-    if (l == _fsl) continue;
-    _p[idx++] = (leg_ifaces_[l]->eef()
-        + body_iface_->leg_base(l)).head(2);
-  }
-
-  return __incenter(_p[0], _p[1], _p[2]);
+//  _p[0] = __cross_point(_lwp[LegType::FL], _lwp[LegType::HR],
+//      _lwp[LegType::FR], _lwp[LegType::HL]);
+//  _p[1] = _lwp[LEGTYPE_CF(_fsl)];
+//  if ((LegType::FL == _fsl) || (LegType::HL == _fsl)) {
+//    _p[1] = (leg_ifaces_[LegType::FR]->eef() + body_iface_->leg_base(LegType::FR)).head(2);
+//    _p[2] = (leg_ifaces_[LegType::HR]->eef() + body_iface_->leg_base(LegType::HR)).head(2);
+//  } else {
+//    _p[1] = (leg_ifaces_[LegType::FL]->eef() + body_iface_->leg_base(LegType::FL)).head(2);
+//    _p[2] = (leg_ifaces_[LegType::HL]->eef() + body_iface_->leg_base(LegType::HL)).head(2);
+//  }
+//  _next_cog_proj = geometry::incenter_of_triangle(_p[0], _p[1], _p[2]);
+//  // _next_cog_proj = __incenter(_p[0], _p[1], _p[2]);
+//  return _next_cog_proj;
+//
+//  int idx = 0;
+//  FOR_EACH_LEG(l) {
+//    if (l == _fsl) continue;
+//    _p[idx++] = (leg_ifaces_[l]->eef()
+//        + body_iface_->leg_base(l)).head(2);
+//  }
+//
+//  return __incenter(_p[0], _p[1], _p[2]);
 }
 
 // StateMachineBase* Walk::state_machine() { return state_machine_; }

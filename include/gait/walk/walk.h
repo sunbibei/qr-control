@@ -16,7 +16,7 @@
 ///! whether the colored output the joint position.
 #define DIS_JNT_LIMIT
 ///! whether record the EEF trajectory
-#define RECORDER_EEF_TRAJ
+// #define RECORDER_EEF_TRAJ
 #ifdef  RECORDER_EEF_TRAJ
 #include "adt/discrete.h"
 #endif
@@ -147,6 +147,10 @@ private:
    * @brief It control the phase of that the foot is close to stand.
    */
   void close_to_floor();
+  /*!
+   * @brief print the stability margin
+   */
+  Eigen::Vector3d stability_margin(LegType sl);
 protected:
   ///! The interface for body
   class RobotBody*      body_iface_;

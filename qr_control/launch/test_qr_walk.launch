@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+	<arg name="use_ros_control" default="True" />
+	<arg name="controller_name" default="Test4QrWalker" />
+	<arg name="parameters_file" default="position_joint_group_controller.yaml" />
+
+	<param if="$(arg use_ros_control)"
+		name="$(arg controller_name)/type" value="qr_control/$(arg controller_name)" />
+  <rosparam command="load" file="$(find qr_control)/config/$(arg parameters_file)" />
+
+  <!-- spawn controller manager -->
+  <node if="$(arg use_ros_control)" name="controller_spawner" pkg="controller_manager"
+  	type="spawner" respawn="false" output="screen"
+  	args="--shutdown-timeout -1 $(arg controller_name)" />
+
+</launch>

@@ -1,0 +1,13 @@
+LENGTH:
+ yaw-hip:   40mm
+ hip-knee:  273mm
+ knee-foot: 225mm
+
+
+ANGLE:
+ pitch:-20~20
+ hip:40~90
+ knee:30~90
+
+
+

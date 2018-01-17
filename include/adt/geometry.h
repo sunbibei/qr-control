@@ -38,14 +38,16 @@ double  distance(const Linear& l, const Point2d& p);
 ///! the angle between Linear l1 and l2.
 double  angle(const Linear& l1, const Linear& l2);
 
+///! whether in the triangle.
+bool    is_in_triangle          (const Point2d& A, const Point2d& B, const Point2d& C, const Point2d& p);
 ///! the area of triangle.
-double  area_of_triangle        (const Point2d& a, const Point2d& b, const Point2d& c);
+double  area_of_triangle        (const Point2d& A, const Point2d& B, const Point2d& C);
 ///! the incenter of triangle.
-Point2d incenter_of_triangle    (const Point2d& a, const Point2d& b, const Point2d& c);
+Point2d incenter_of_triangle    (const Point2d& A, const Point2d& B, const Point2d& C);
 ///! the orthocentre of triangle
-Point2d orthocentre_of_triangle (const Point2d& a, const Point2d& b, const Point2d& c);
+Point2d orthocentre_of_triangle (const Point2d& A, const Point2d& B, const Point2d& C);
 ///! the circumcentre of triangle
-Point2d circumcentre_of_triangle(const Point2d& a, const Point2d& b, const Point2d& c);
+Point2d circumcentre_of_triangle(const Point2d& A, const Point2d& B, const Point2d& C);
 
 } /* end namespace geometry */
 } /* end namespace qr_control */

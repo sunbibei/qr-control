@@ -46,6 +46,25 @@ double  angle(const Linear& l1, const Linear& l2) {
   return std::acos(std::abs(l1.head(2).dot(l2.head(2))) / (l1.head(2).norm()*l2.head(2).norm()));
 }
 
+double __cross_val(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2) {
+  return p1.x()*p2.y() - p1.y()*p2.x();
+}
+///! whether in the triangle.
+bool    is_in_triangle          (const Point2d& A, const Point2d& B, const Point2d& C, const Point2d& p) {
+  double ca = __cross_val(C-A, p-A);
+  double ba = __cross_val(B-A, p-A);
+  double cb = __cross_val(C-B, p-B);
+  if (ca * ba > 0) return false; // same +, or same -
+  if ((0 == ca) && (0 == ba)) return true;
+  if (0 == cb) return true;
+  if (0 == ba) {
+    if (ca * cb > 0) return false;
+    else return true;
+  }
+  if (ba * cb > 0) return true;
+  else return false;
+}
+
 ///! the area of triangle.
 double  area_of_triangle        (const Point2d& a, const Point2d& b, const Point2d& c) {
   Eigen::Matrix3d A = Eigen::Matrix3d::Ones();
@@ -56,10 +75,11 @@ double  area_of_triangle        (const Point2d& a, const Point2d& b, const Point
 }
 
 ///! the incenter of triangle.（内心）
-Point2d incenter_of_triangle    (const Point2d& a, const Point2d& b, const Point2d& c) {
-  Eigen::Vector3d lens(distance(a, b), distance(a, c), distance(b, c));
-  Eigen::Vector3d xs(a.x(), b.x(), c.x());
-  Eigen::Vector3d ys(a.y(), b.y(), c.y());
+Point2d incenter_of_triangle    (const Point2d& A, const Point2d& B, const Point2d& C) {
+  ///! lens = (a, b, c)
+  Eigen::Vector3d lens(distance(B, C), distance(A, C), distance(A, B));
+  Eigen::Vector3d xs(A.x(), B.x(), C.x());
+  Eigen::Vector3d ys(A.y(), B.y(), C.y());
   return Point2d( (lens.dot(xs)), (lens.dot(ys)) ) / lens.sum();
 }
 
