@@ -172,7 +172,7 @@ Walk::Walk()
 
 Walk::~Walk() {
 #ifdef RECORDER_EEF_TRAJ
-  eefs_traj_recorder_.save("/home/bibei/Workspaces/matlab/trajs.csv");
+  eefs_traj_recorder_.save("/home/robot/Workspaces/Matlab/trajs.csv");
 #endif
 
 #ifdef PUB_ROS_TOPIC
@@ -377,8 +377,9 @@ void Walk::checkState() {
     ///! Every twice swing leg then adjusting COG.
     if ((LegType::FL == swing_leg_) || (LegType::FR == swing_leg_)) {
       current_state_ = WalkState::WK_MOVE_COG;
-    } else
+    } else {
       current_state_ = WalkState::WK_SWING;
+    }
     ///! clear the old trajectory.
     eef_traj_.reset();
     ///! program the next swing leg
@@ -782,11 +783,10 @@ Eigen::Vector3d Walk::prog_next_fpt(LegType _fsl) {
 
   if (std::abs(_other_fpt.x() - _last_fpt.x()) > 0.5*params_->FOOT_STEP) {
     _next_fpt.x() = _other_fpt.x() + params_->FOOT_STEP;
-    _next_fpt.y() = _other_fpt.y();
   } else {
     _next_fpt.x() += params_->FOOT_STEP;
-    _next_fpt.y()  = _last_fpt.y() + std::abs(_next_fpt.x() - _last_fpt.x()) * tan(params_->FORWARD_ALPHA);
   }
+  _next_fpt.y()  = _last_fpt.y() + std::abs(_next_fpt.x() - _last_fpt.x()) * tan(params_->FORWARD_ALPHA);
   _next_fpt.z() = _last_fpt.z()/* + 0.3*params_->SWING_HEIGHT*/;
 
   return _next_fpt;
