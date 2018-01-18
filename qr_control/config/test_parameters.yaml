@@ -1,0 +1,8 @@
+jnt_num_of_leg: 3
+leg_num: 1
+
+joint_0: "left_back_hip"
+joint_1: "left_back_knee"
+joint_2: "left_back_yaw"
+root_0:  "body"
+tip_0:   "left_back_foot"

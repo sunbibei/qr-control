@@ -9,20 +9,11 @@
 
 namespace qr_control {
 
-SINGLETON_IMPL_NO_CREATE(QrRobot)
+SINGLETON_IMPL(QrRobot)
 
-QrRobot* QrRobot::create_instance(const MiiString& _tag) {
-  if (nullptr != instance_) {
-    LOG_WARNING << "This method 'create_instance()' is called twice.";
-  } else {
-    instance_ = new QrRobot(_tag);
-  }
-  return instance_;
-}
-
-QrRobot::QrRobot(const MiiString& _tag)
-  : LegRobot(_tag) {
-  ;
+QrRobot::QrRobot()
+  : LegRobot() {
+  ; // Nothing to do here.
 }
 
 QrRobot::~QrRobot() {
@@ -31,7 +22,10 @@ QrRobot::~QrRobot() {
 
 double QrRobot::stability_margin() const {
   // TODO
-  return 0.0;
+  return 10000.0;
 }
 
 } /* namespace qr_control */
+
+//#include <class_loader/class_loader_register_macro.h>
+//CLASS_LOADER_REGISTER_CLASS(qr_control::QrRobot, Label)

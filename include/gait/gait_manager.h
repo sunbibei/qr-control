@@ -16,7 +16,7 @@
 namespace qr_control {
 
 class GaitManager
-    : public middleware::internal::ResourceManager<GaitBase> {
+    : public internal::ResourceManager<GaitBase> {
   SINGLETON_DECLARE(GaitManager)
 
 public:

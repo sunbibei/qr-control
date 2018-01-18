@@ -1,0 +1,15 @@
+jnt_group_controller:
+  type: position_controllers/JointGroupPositionController
+  joints:
+    - "hl_hip"
+    - "hl_knee"
+    - "hl_yaw"
+    - "fl_hip"
+    - "fl_knee"
+    - "fl_yaw"
+    - "fr_hip"
+    - "fr_knee"
+    - "fr_yaw"
+    - "hr_hip"
+    - "hr_knee"
+    - "hr_yaw"

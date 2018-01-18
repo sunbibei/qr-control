@@ -13,7 +13,7 @@ namespace qr_control {
 SINGLETON_IMPL(GaitManager)
 
 GaitManager::GaitManager()
-  : middleware::internal::ResourceManager<GaitBase>(),
+  : internal::ResourceManager<GaitBase>(),
     running_gait_(nullptr), active_gait_(nullptr) {
 
 }

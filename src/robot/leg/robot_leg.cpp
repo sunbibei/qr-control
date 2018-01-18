@@ -6,6 +6,7 @@
  */
 
 #include "robot/leg/robot_leg.h"
+#include "robot/leg_robot.h"
 
 ///! Just test
 // class Trajectory { };
@@ -16,6 +17,13 @@ RobotLeg::RobotLeg()
   : MathLeg(),
     curr_target_(TargetType::INVALID_TARGET) {
   curr_target_jnt_for_traj_ = JntType::UNKNOWN_JNT;
+}
+
+bool RobotLeg::init() {
+  if (!MathLeg::init()) return false;
+
+  LegRobot::instance()->leg_ifaces_[leg_type()] = this;
+  return true;
 }
 
 RobotLeg::~RobotLeg() {
