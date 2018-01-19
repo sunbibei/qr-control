@@ -556,12 +556,15 @@ void Walk::close_to_floor() {
 }
 
 bool Walk::end_swing_leg() {
-  auto diff = (ctf_eef_[swing_leg_] - leg_ifaces_[swing_leg_]->eef()).norm();
+ // auto diff = (ctf_eef_[swing_leg_] - leg_ifaces_[swing_leg_]->eef()).norm();
+  auto diff = (eef_traj_->sample(eef_traj_->ceiling()).head(2)
+                 - leg_ifaces_[swing_leg_]->eef().head(2)).norm();
 
   ///! for real robot
-//  return ( (LEGTYPE_IS_FRONT(swing_leg_)) ?
-//            ( (diff < 0.3) || (timer_->span() > 2*params_->SWING_TIME) )
-//            : (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) );
+ // return ( (diff < 1) ? ((LEGTYPE_IS_FRONT(swing_leg_)) ?
+ //           ( (timer_->span() > 2*params_->SWING_TIME) && (diff < 0.3) )
+ //           : (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) )
+ //           : false );
 
 //  return ( (diff < 1) && ( (LEGTYPE_IS_HIND(swing_leg_)) ?
 //      (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state())
