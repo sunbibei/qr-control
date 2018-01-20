@@ -10,6 +10,47 @@ void Math::init()
   verbose = true;
 }
 
+_Position Math::cal_left_circul(float angle, int LegId)
+{ 
+  _Position result = {0,0,0};
+  float r = sqrt(pow(Body_W,2) + pow(Body_L,2));
+  float init_angle = atan(Body_W/Body_L);
+  float theta = init_angle - angle*PI/180.0;
+  float theta2 = acos((2*pow(r,2) - pow(2*Body_W,2))/2.0/r/r);
+  if(theta<0) std::cout<<"Error! calculating turn angle wrong!"<<std::endl;
+
+  switch(LegId)
+  {
+    case LF:
+    {
+      result.x = r * cos(theta) - Body_L;
+      result.y = r * sin(theta) - Body_W;
+      break;
+    }     
+    case RF:
+    {
+      result.x = r * cos(theta2-theta) - Body_L;
+      result.y = Body_W - r * sin(theta2-theta);
+      break;
+    }
+    case LB:
+    {
+      result.x = Body_L - r * cos(theta2-theta);
+      result.y = r * sin(theta2-theta) - Body_W;
+      break;
+    }    
+    case RB:
+    {
+      result.x = Body_L - r * cos(theta);
+      result.y = Body_W - r * sin(theta);
+      break;
+    }   
+    default:break;
+  }
+  std::cout<<"result:"<<result.x<<", "<<result.y<<std::endl;
+  return result;   
+}
+
 bool Math::getJacobMatrix(const EV3& a, EM3& JacobMatrix, EM3& inverseJacobMatrix)
 {
   bool invertible; 

@@ -20,8 +20,8 @@ static const  int Joint_Num = 12;
 static const  int Leg_Num = 4;
 static const float PI = 3.14159265;
 static const  int Foot_Steps = 10;//10
-static const  int Swing_Height = 5;
-static const  int TD_Height = 1.5;
+static int Swing_Height = 5;
+static int TD_Height = 1.5;
 static const  int Stance_Height = 46;
 static const  int Init_Num = 5;
 static const  int Swing_Num  = 50;
@@ -32,7 +32,7 @@ static const double L2 = 22.5;
 static const double Body_L = 27.65;
 static const double Body_W = 16.8;
 static const double Body_D = 10;
-static const float cogThreshold = 6.5;
+static float cogThreshold = 6.5;
 static int Stance_Num = 25;
 static bool lb_flag = true;
 static bool lf_flag = true;
@@ -127,6 +127,14 @@ struct _Position
   _Position operator - ( const _Position& A )  
   {  
     return _Position(this->x-A.x, this->y-A.y, this->z-A.z);  
+  }  
+  bool operator == ( const _Position& A )  
+  {  
+    if(this->x == A.x && this->y == A.y && this->z == A.z)
+    {
+      return true;
+    }
+    return false;  
   }  
   // _Position operator = ( const _Position& A )  
   // {  

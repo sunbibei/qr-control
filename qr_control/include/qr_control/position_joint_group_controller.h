@@ -11,6 +11,7 @@
 #include <ros/time.h>
 #include <ros/duration.h>
 #include <std_msgs/Float64MultiArray.h>
+#include <std_msgs/String.h>
 #include <sensor_msgs/JointState.h>
 #include <ros/node_handle.h>
 #include <boost/scoped_ptr.hpp>
@@ -69,12 +70,20 @@ namespace qr_control
 		std::vector< std::string > joint_names_;
 		std::vector< hardware_interface::JointHandle > joints_;
 		boost::scoped_ptr<realtime_tools::RealtimePublisher<std_msgs::Float64MultiArray>> joint_state_publisher_;
+				boost::scoped_ptr<realtime_tools::RealtimePublisher<std_msgs::String>> walk_state_publisher_;
 
 	private:
     /***********************/
  		bool HangUpWalk = false;
+ 		bool Run_State = false;
+ 		bool Pause = false;
  		bool Only_CoG = false;
  		bool Lift_Off = true;
+ 		bool State_Transfer_Ready = false;
+ 		int Forw_Walk = 0;
+ 		int Back_Walk = 0;
+ 		int Turn_Walk = 0;
+ 		int Trot_Phase = 0;
  		/***********************/
 		int Loop_Count;
 		long long Update_count = 0;
@@ -126,48 +135,31 @@ namespace qr_control
 		std::vector<const double*>     jnt_tors_;
 		void __initAllofData();
 
-		void state_transfer();
 		void update_shoulder_pos(float pitch,float yaw,float roll);	
 		void forward_kinematics();
 		void reverse_kinematics();
 		void pose_init();
 		void cog_adj();
+		bool turn_left(float turn_angle);
 		void flow_control(int timeorder);
 		void cog_pos_assign(_Position Adj);
 		void cog_swing_assign(_Position Adj, int legId);
-
 		void swing_control();
-		void fast_swing_control();
-		void hardware_delay_test();
 		void assign_next_foot();
 		void on_ground_control(int legId);	
 		void lift_ground_control(int legId);
-		void cog_adj_backward();
-		void flow_control_backward(int timeorder);
-		void assign_next_foot_backward();
-		void assign_next_foot_turn();
-		void flow_control_turn(int timeorder);
-		void cog_adj_turn();
 		void command_assign(Angle_Ptr Angle);
-		void command_init();
 		void print_command();
-		void print_real_cog();
 		void print_error();
 
 		bool stand_stable(std::vector<bool> IsContact);
 		bool contact_keep(std::vector<bool> IsContact);
-		void sensor_height();	
-		void posture_keep(std::vector<bool> IsContact);
-		bool security_check();
-		bool slip_check();
-		void forward_control(float Kp,float Kv,float Kd);
-		float single_forward_control(float d_pos, float d_vel, float Kp, float Kv, float Kd, float f_pos, float f_vel);
 
 		_Position innerTriangle(const _Position &A, const _Position &B, const _Position &C);
 		_Position get_stance_velocity(_Position Adj_vec, unsigned int Loop);
 		float get_stance_velocity(float adj, unsigned int Loop);
 
-		_Position get_CoG_adj_vec(const _Position &Next_Foothold, unsigned int Swing_Order);
+		_Position get_CoG_adj_vec(unsigned int Swing_Order);
 	};
 
 }

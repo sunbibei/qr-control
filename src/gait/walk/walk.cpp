@@ -111,7 +111,11 @@ Walk::Walk()
 
 Walk::~Walk() {
 #ifdef RECORDER_EEF_TRAJ
+<<<<<<< HEAD
+  eefs_traj_recorder_.save("/home/robot/Workspaces/Matlab/trajs.csv");
+=======
   eefs_traj_recorder_.save("/home/bibei/Workspaces/matlab/Trajectory/trajs.csv");
+>>>>>>> 95c2ffb74a80c639e1a155165ba527f94c7c79cc
 #endif
 
 #ifdef PUB_ROS_TOPIC
@@ -344,8 +348,9 @@ void Walk::checkState() {
     ///! Every twice swing leg then adjusting COG.
     if ((LegType::FL == swing_leg_) || (LegType::FR == swing_leg_)) {
       current_state_ = WalkState::WK_MOVE_COG;
-    } else
+    } else {
       current_state_ = WalkState::WK_SWING;
+    }
     ///! clear the old trajectory.
     eef_traj_.reset();
     ///! program the next swing leg
@@ -585,12 +590,15 @@ void Walk::close_to_floor() {
 }
 
 bool Walk::end_swing_leg() {
-  auto diff = (ctf_eef_[swing_leg_] - leg_ifaces_[swing_leg_]->eef()).norm();
+ // auto diff = (ctf_eef_[swing_leg_] - leg_ifaces_[swing_leg_]->eef()).norm();
+  auto diff = (eef_traj_->sample(eef_traj_->ceiling()).head(2)
+                 - leg_ifaces_[swing_leg_]->eef().head(2)).norm();
 
   ///! for real robot
-//  return ( (LEGTYPE_IS_FRONT(swing_leg_)) ?
-//            ( (diff < 0.3) || (timer_->span() > 2*params_->SWING_TIME) )
-//            : (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) );
+ // return ( (diff < 1) ? ((LEGTYPE_IS_FRONT(swing_leg_)) ?
+ //           ( (timer_->span() > 2*params_->SWING_TIME) && (diff < 0.3) )
+ //           : (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) )
+ //           : false );
 
 //  return ( (diff < 1) && ( (LEGTYPE_IS_HIND(swing_leg_)) ?
 //      (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state())
@@ -808,11 +816,11 @@ Eigen::Vector3d Walk::prog_next_fpt(LegType _fsl) {
 
   if (std::abs(_other_fpt.x() - _last_fpt.x()) > 0.5*params_->FOOT_STEP) {
     _next_fpt.x() = _other_fpt.x() + params_->FOOT_STEP;
-    // _next_fpt.y() = _other_fpt.y();
   } else {
     _next_fpt.x() += params_->FOOT_STEP;
     // _next_fpt.y()  = _last_fpt.y() + std::abs(_next_fpt.x() - _last_fpt.x()) * tan(params_->FORWARD_ALPHA);
   }
+  _next_fpt.y()  = _last_fpt.y() + std::abs(_next_fpt.x() - _last_fpt.x()) * tan(params_->FORWARD_ALPHA);
   _next_fpt.z() = _last_fpt.z()/* + 0.3*params_->SWING_HEIGHT*/;
 
   return _next_fpt;
