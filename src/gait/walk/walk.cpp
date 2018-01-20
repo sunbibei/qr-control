@@ -177,6 +177,8 @@ bool Walk::starting() {
   _sm->registerStateCallback(WalkState::WK_SPIRALLING,&Walk::spiralling,this);
   _sm->registerStateCallback(WalkState::WK_HANG,      &Walk::hang_walk, this);
 
+  _sm->registerStateCallback(WalkState::WK_WALK,      &Walk::walk, this);
+
   current_state_ = WalkState::WK_INIT_POSE;
 #ifdef PUB_ROS_TOPIC
   cmd_pub_.reset(new realtime_tools::RealtimePublisher<
@@ -222,6 +224,36 @@ void Walk::checkState() {
   static int64_t _s_tmp_span = 0;
 
   switch (current_state_) {
+  case WalkState::WK_WALK:
+  {
+    if (!timer_->running()) {
+      ///! programming the swing trajectory.
+      auto _next_eef = leg_ifaces_[swing_leg_]->eef();
+      double _translation = params_->FOOT_STEP - _next_eef.x();
+      _next_eef.x()       = params_->FOOT_STEP;
+      prog_eef_traj(_next_eef);
+
+      ///! propgraming the CoG trajectory.
+      Eigen::Vector2d _next_cog = body_iface_->cog().head(2);
+      _next_cog.x() += 0.25 * _translation;
+      prog_cog_traj(_next_cog);
+
+      ///! start the timer
+      timer_->start();
+    }
+
+    if (!end_walk()) return;
+
+    ///! the end of WK_INIT_POS
+    timer_->stop(&_s_tmp_span);
+    LOG_WARNING << "*******----WALK ONE-STEP OK!("
+        << _s_tmp_span << "ms)----*******";
+
+    PRESS_THEN_GO
+    ///! updating the following swing leg
+    swing_leg_     = next_leg(swing_leg_);
+    break;
+  }
   case WalkState::WK_INIT_POSE:
   {
     ///! the begin of WK_INIT_POS
@@ -245,14 +277,15 @@ void Walk::checkState() {
     PRESS_THEN_GO
     ///! updating the following swing leg
     swing_leg_     = next_leg(swing_leg_);
-    current_state_ = WalkState::WK_MOVE_COG;
+    // current_state_ = WalkState::WK_MOVE_COG;
+    current_state_ = WalkState::WK_WALK;
     break;
   }
   case WalkState::WK_MOVE_COG:
   {
     ///! the begin of WK_MOVE_COG
     if (!timer_->running()) {
-      prog_cog_traj();
+      prog_cog_traj(prog_next_cog(swing_leg_));
 
       // PRESS_THEN_GO
       timer_->start();
@@ -282,8 +315,8 @@ void Walk::checkState() {
   {
     ///! the begin of WK_SWING
     if (!timer_->running()) {
-      // prog_next_fpt();
-      prog_eef_traj();
+      // Eigen::Vector3d _next_fpt = prog_next_fpt();
+      prog_eef_traj(prog_next_fpt(swing_leg_));
       // sum_interval_ = 0;
       timer_->start();
     }
@@ -396,7 +429,8 @@ void Walk::post_tick() {
 //  if (current_state_ == WalkState::WK_SWING) {
 //    __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
 //  } else
-  print_jnt_pos(JNTS_TARGET);
+  // print_jnt_pos(JNTS_TARGET);
+  print_eef_pos();
 
 #ifdef RECORDER_EEF_TRAJ
     Discrete<double, 14>::StateVec vec;
@@ -568,6 +602,27 @@ bool Walk::end_swing_leg() {
 }
 
 // TODO
+void Walk::walk() {
+  if (!timer_->running())
+    return;
+
+  leg_ifaces_[swing_leg_]->ik(
+      eef_traj_->sample(timer_->span()/1000.0), leg_cmds_[swing_leg_]->target);
+
+  FOR_EACH_LEG(l) {
+    if (swing_leg_ != l) {
+      leg_ifaces_[l]->ik(
+          cog2eef_traj_[l]->sample((double)timer_->span()/params_->COG_TIME),
+          leg_cmds_[l]->target);
+    }
+  }
+}
+
+bool Walk::end_walk() {
+  return (timer_->span() >= 2*params_->COG_TIME);
+}
+
+// TODO
 void Walk::stance() {
 //  FOR_EACH_LEG(l) {
 //    ;
@@ -589,9 +644,9 @@ void Walk::spiralling() {
   ;
 }
 
-void Walk::prog_eef_traj() {
+void Walk::prog_eef_traj(const Eigen::Vector3d& _next_fpt) {
   Eigen::Vector3d _last_fpt = leg_ifaces_[swing_leg_]->eef();
-  Eigen::Vector3d _next_fpt = prog_next_fpt(swing_leg_);
+  // Eigen::Vector3d _next_fpt = prog_next_fpt(swing_leg_);
 
   Eigen::Vector3d _rise_fpt = _last_fpt;
   _rise_fpt.z() = _last_fpt.z() + 0.5*params_->SWING_HEIGHT;
@@ -763,14 +818,14 @@ Eigen::Vector3d Walk::prog_next_fpt(LegType _fsl) {
   return _next_fpt;
 }
 
-void Walk::prog_cog_traj() {
+void Walk::prog_cog_traj(const Eigen::Vector2d& _next_cog) {
   Eigen::Vector3d _p0(0.0, 0.0, -params_->STANCE_HEIGHT);
   Eigen::Vector3d _p1(0.0, 0.0, -params_->STANCE_HEIGHT);
-  Eigen::Vector2d _tmp_next_cog = prog_next_cog(swing_leg_);
+  // Eigen::Vector2d _tmp_next_cog = prog_next_cog(swing_leg_);
 
   FOR_EACH_LEG(l) {
     _p0 = leg_ifaces_[l]->eef();
-    _p1.head(2) = _p0.head(2) - _tmp_next_cog.head(2);
+    _p1.head(2) = _p0.head(2) - _next_cog.head(2);
 
     Eigen::MatrixXd A;
     A.resize(4, 4);
@@ -851,11 +906,6 @@ Eigen::Vector2d Walk::prog_next_cog(LegType _fsl) {
 //
 //  return __incenter(_p[0], _p[1], _p[2]);
 }
-
-// StateMachineBase* Walk::state_machine() { return state_machine_; }
-
-// TODO
-void Walk::walk() { ; }
 
 //Eigen::Vector2d Walk::cog_proj1() {
 //  if (LegType::UNKNOWN_LEG == swing_leg_)

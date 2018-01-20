@@ -42,6 +42,8 @@ enum WalkState {
   WK_SWING,
   WK_SWING_1,
   WK_STOP,
+  WK_WALK_INIT,
+  WK_WALK,
   WK_SPIRALLING,
   WK_HANG,
   N_WK_STATE,
@@ -111,17 +113,21 @@ private:
    */
   bool end_stance();
   /*!
+   * @brief The criterion for WK_WALK
+   */
+  bool end_walk();
+  /*!
    * @brief Update the next foot point for the swing leg.
    *        The default next foot point is {STEP, XX, -BH},
    *        namely the swing leg move forward STEP cm. The
    *        trajectory is quadratic curve.
    */
-  void prog_eef_traj();
+  void prog_eef_traj(const Eigen::Vector3d& _next_fpt);
   /*!
    * @brief Programming the trajectory of COG, and convert to the trajectory
    *        of end-effector. This trajectory is linearity curve.
    */
-  void prog_cog_traj();
+  void prog_cog_traj(const Eigen::Vector2d& _next_cog);
 private:
   /*!
    * @brief Choice the next swing leg @next by @curr LegType.
