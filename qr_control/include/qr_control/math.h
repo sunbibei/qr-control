@@ -30,6 +30,8 @@ namespace qr_control {
     bool isJacobInvertible(const EV3& a);
     float calPos(const EV3& dist, const int& t, const int& duration);
 
+    _Position cal_left_circul(float angle, int LegId);
+
   };
 }
 #endif
