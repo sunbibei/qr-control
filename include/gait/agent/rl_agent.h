@@ -5,6 +5,8 @@
  *      Author: bibei
  */
 
+#ifdef  BUILD_RL_AGENT
+
 #ifndef INCLUDE_GAIT_AGENT_RL_AGENT_H_
 #define INCLUDE_GAIT_AGENT_RL_AGENT_H_
 
@@ -63,3 +65,5 @@ protected:
 } /* namespace qr_control */
 
 #endif /* INCLUDE_GAIT_AGENT_RL_AGENT_H_ */
+
+#endif

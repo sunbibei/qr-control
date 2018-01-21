@@ -31,6 +31,8 @@ double  distance(const Point2d& p1, const Point2d& p2);
 
 ///! the linear cross both the a and b, if a == b, return (0, 0, 0);
 Linear  linear(const Point2d& a, const Point2d& b);
+///! the linear cross the point a with the slope k;
+Linear  linear(double k, const Point2d& b);
 ///! the cross point of l1 and l2, if these is not exist cross point, return (NaN, NaN);
 Point2d cross_point(const Linear& l1, const Linear& l2);
 ///! the distance between the point p to the linear l.

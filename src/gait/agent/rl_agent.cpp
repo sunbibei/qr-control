@@ -5,6 +5,8 @@
  *      Author: bibei
  */
 
+#ifdef  BUILD_RL_AGENT
+
 #include "gait/agent/rl_agent.h"
 #include "robot/leg/qr_leg.h"
 
@@ -303,3 +305,5 @@ void RLAgent::trialSubCb(const rl_msgs::TrialCommand::ConstPtr& msg) {
 
 #include <class_loader/class_loader_register_macro.h>
 CLASS_LOADER_REGISTER_CLASS(qr_control::RLAgent, Label)
+
+#endif

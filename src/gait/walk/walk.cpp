@@ -233,13 +233,30 @@ void Walk::checkState() {
     if (!timer_->running()) {
       ///! programming the swing trajectory.
       auto _next_eef = leg_ifaces_[swing_leg_]->eef();
-      double _translation = params_->FOOT_STEP - _next_eef.x();
-      _next_eef.x()       = params_->FOOT_STEP;
+      // double _translation = params_->FOOT_STEP - _next_eef.x();
+      _next_eef.x()  = params_->FOOT_STEP;
       prog_eef_traj(_next_eef);
 
       ///! propgraming the CoG trajectory.
-      Eigen::Vector2d _next_cog = body_iface_->cog().head(2);
-      _next_cog.x() += 0.25 * _translation;
+      auto _cf_eef = leg_ifaces_[LEGTYPE_CF(swing_leg_)]->eef();
+      auto _ch_eef = leg_ifaces_[LEGTYPE_CH(swing_leg_)]->eef();
+      Eigen::Vector2d _last_cog = body_iface_->cog().head(2);
+      Eigen::Vector2d _next_cog(_last_cog.x() + 0.5*params_->FOOT_STEP, _last_cog.y());
+      Eigen::Vector2d _cs(0.0, 0.0);
+      if (LEGTYPE_IS_HIND(swing_leg_)) {
+        _cs = geometry::cross_point(
+            geometry::linear(_cf_eef.head(2), _next_eef.head(2)),
+            geometry::linear(_next_cog, _last_cog));
+        _next_cog = (_cs + _last_cog) * 0.5;
+      } else {
+        auto _il_eef = leg_ifaces_[LEGTYPE_IL(swing_leg_)]->eef();
+        _cs = geometry::cross_point(
+            geometry::linear(_cf_eef.head(2), _il_eef.head(2)),
+            geometry::linear(_next_cog, _last_cog));
+        _next_cog = _cs;
+      }
+      LOG_WARNING << "NEXT COG: " << _next_cog.transpose();
+      // _next_cog.x() += 0.5 * _translation;
       prog_cog_traj(_next_cog);
 
       ///! start the timer
@@ -434,7 +451,7 @@ void Walk::post_tick() {
 //  if (current_state_ == WalkState::WK_SWING) {
 //    __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
 //  } else
-  // print_jnt_pos(JNTS_TARGET);
+  print_jnt_pos(/*JNTS_TARGET*/);
   print_eef_pos();
 
 #ifdef RECORDER_EEF_TRAJ
@@ -627,7 +644,7 @@ void Walk::walk() {
 }
 
 bool Walk::end_walk() {
-  return (timer_->span() >= 2*params_->COG_TIME);
+  return (timer_->span() >= /*2**/params_->COG_TIME);
 }
 
 // TODO

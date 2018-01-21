@@ -25,6 +25,11 @@ Linear  linear(const Point2d& p0, const Point2d& p1) {
   return Linear(k, -1, b);
 }
 
+///! the linear cross the point a with the slope k;
+Linear  linear(double k, const Point2d& p0) {
+  return Linear(k, -1, p0.y() - k*p0.x());
+}
+
 ///! the cross point of l1 and l2, if these is not exist cross point, return (NaN, NaN);
 Point2d cross_point(const Linear& l1, const Linear& l2) {
   Eigen::Matrix2d _cof;
