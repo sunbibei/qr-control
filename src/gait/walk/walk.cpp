@@ -278,8 +278,7 @@ void Walk::checkState() {
     if (!timer_->running()) {
       ///! programming the swing trajectory.
       Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-      // double _translation = params_->FOOT_STEP - _next_eef.x();
-      _next_eef.x()  = wk_params_->FOOT_STEP;
+      _next_eef.head(2)  << wk_params_->FOOT_STEP, 0;
       // prog_eef_traj(_next_eef);
 
       ///! propgraming the CoG trajectory.
@@ -292,7 +291,8 @@ void Walk::checkState() {
         _cs = geometry::cross_point(
             geometry::linear(_cf_eef.head(2), _next_eef.head(2)),
             geometry::linear(_next_cog, _last_cog));
-        _next_cog = (_cs + _last_cog) * 0.5;
+        _next_cog     = (_cs + _last_cog) * 0.5;
+        _next_cog.y() = _cf_eef.y() * 0.15;
       } else {
         // LegType _il = LEGTYPE_IL(swing_leg_);
         Eigen::Vector3d _il_eef = leg_ifaces_[LEGTYPE_IL(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_IL(swing_leg_));
@@ -314,7 +314,7 @@ void Walk::checkState() {
       LOG_WARNING << "STARTING...";
       ///! programming the swing trajectory.
       Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-      _next_eef.x()  = wk_params_->FOOT_STEP;
+      _next_eef.head(2)  << wk_params_->FOOT_STEP, 0;
       prog_eef_traj(_next_eef);
 
       swing_timer_->start();
@@ -500,17 +500,22 @@ void Walk::post_tick() {
 
   FOR_EACH_LEG(leg) {
     ///! Modify the target to keep the stance stability
-    if (!_s_is_hang && (swing_leg_ != leg)) {
+    if (!_s_is_hang) {
       Eigen::Vector3d _eef = leg_ifaces_[leg]->eef();
+      if (swing_leg_ != leg) {
+        if (LegState::TD_STATE != leg_ifaces_[leg]->leg_state()) {
+          double diff = td_params_->TD_TARGET[leg] - leg_ifaces_[leg]->foot_force();
 
-      if (LegState::TD_STATE != leg_ifaces_[leg]->leg_state()) {
-        double diff = td_params_->TD_TARGET[leg] - leg_ifaces_[leg]->foot_force();
-
-        leg_cmd_eefs_[leg].z() = _eef.z() - td_params_->TD_KP*diff;
-        leg_cmd_eefs_[leg].z() = __clamp<double>(leg_cmd_eefs_[leg].z(),
-            -td_params_->STANCE_CEILING, -td_params_->STANCE_FLOOR);
-      } else {
-        leg_cmd_eefs_[leg].z() = _eef.z();
+          leg_cmd_eefs_[leg].z() = _eef.z() - td_params_->TD_KP*diff;
+          leg_cmd_eefs_[leg].z() = __clamp<double>(leg_cmd_eefs_[leg].z(),
+              -td_params_->STANCE_CEILING, -td_params_->STANCE_FLOOR);
+        } else {
+          leg_cmd_eefs_[leg].z() = _eef.z();
+        }
+      } else { ///! swing_leg_ == leg
+        if (LegState::TD_STATE == leg_ifaces_[leg]->leg_state()) {
+          leg_cmd_eefs_[leg] = _eef;
+        }
       }
     }
 
