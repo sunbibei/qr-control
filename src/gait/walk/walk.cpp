@@ -64,18 +64,13 @@ struct WalkParam {
   double   SWING_DROP;
   ///! The minimum stability margin could to swing leg.
   double   MARGIN_THRES;
-  ///! The minimum delta to keep the robot stance.
-  double   STANCE_DELTA;
-  ///! In order to keep the stance allowed the maximum delta height.
-  double   STANCE_CEILING;
 
   WalkParam(const MiiString& _tag)
     : THRES_COG(6.5),    FOOT_STEP(10),
       STANCE_HEIGHT(46), SWING_HEIGHT(5),
       FORWARD_ALPHA(0),  STOP_HEIGHT_SCALE(0.3),
       COG_TIME(2000),    SWING_TIME(2000),
-      MARGIN_THRES(6),   STANCE_DELTA(0.1),
-      STANCE_CEILING(1) {
+      MARGIN_THRES(6) {
     auto cfg = MiiCfgReader::instance();
     cfg->get_value(_tag, "cog_threshold",THRES_COG);
     cfg->get_value(_tag, "step",         FOOT_STEP);
@@ -92,15 +87,48 @@ struct WalkParam {
     cfg->get_value(_tag, "swing_drop",     SWING_DROP);
 
     cfg->get_value(_tag, "margin_threshold", MARGIN_THRES);
+  }
+};
+
+struct TdParam {
+  ///! The minimum delta to keep the robot stance.
+  double   STANCE_DELTA;
+  ///! In order to keep the stance allowed the minimum height.
+  double   STANCE_FLOOR;
+  ///! In order to keep the stance allowed the maximum height.
+  double   STANCE_CEILING;
+  ///! The target for legs
+  double   TD_TARGET[LegType::N_LEGS];
+  ///! The Kp
+  double   TD_KP;
+
+  TdParam(const MiiString& _tag)
+  : STANCE_DELTA(0.1), STANCE_FLOOR(45), STANCE_CEILING(49),
+    TD_KP(0.01) {
+    auto cfg = MiiCfgReader::instance();
+
     cfg->get_value(_tag, "stance_delta",     STANCE_DELTA);
+    cfg->get_value(_tag, "stance_floor",     STANCE_FLOOR);
     cfg->get_value(_tag, "stance_ceiling",   STANCE_CEILING);
+    cfg->get_value(_tag, "k_p",              TD_KP);
+
+    MiiVector<double> targets;
+    cfg->get_value_fatal(_tag, "targets", targets);
+    if (LegType::N_LEGS != targets.size()) {
+      LOG_FATAL << "The size of touchdown parameters is wrong!";
+    }
+
+    for (size_t i = 0; i < targets.size(); ++i) {
+      TD_TARGET[i] = targets[i];
+    }
   }
 };
 
 Walk::Walk()
   : current_state_(WalkState::UNKNOWN_WK_STATE),
     body_iface_(nullptr),
-    params_(nullptr), timer_(nullptr), swing_timer_(nullptr),
+    wk_params_(nullptr), td_params_(nullptr),
+    timer_(nullptr), swing_timer_(nullptr),
     eef_traj_(nullptr), swing_leg_(LegType::UNKNOWN_LEG),
     post_tick_interval_(50)
 {
@@ -172,8 +200,10 @@ bool Walk::init() {
   cfg->get_value(getLabel(), "interval", post_tick_interval_);
 
   MiiString _tag = Label::make_label(getLabel(), "coefficient");
-  params_ = new WalkParam(_tag);
+  wk_params_ = new WalkParam(_tag);
 
+  _tag = Label::make_label(getLabel(), "touchdown");
+  td_params_ = new TdParam(_tag);
   return true;
 }
 
@@ -207,6 +237,9 @@ bool Walk::starting() {
   FOR_EACH_LEG(l) {
     leg_cmds_[l]   = new LegTarget;
     leg_cmds_[l]->cmd_type = JntCmdType::CMD_POS;
+    leg_cmds_[l]->target.resize(3);
+
+    stance_deltas_[l] = 0;
   }
 
   LOG_INFO << "The walk gait has STARTED!";
@@ -246,14 +279,14 @@ void Walk::checkState() {
       ///! programming the swing trajectory.
       Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
       // double _translation = params_->FOOT_STEP - _next_eef.x();
-      _next_eef.x()  = params_->FOOT_STEP;
+      _next_eef.x()  = wk_params_->FOOT_STEP;
       // prog_eef_traj(_next_eef);
 
       ///! propgraming the CoG trajectory.
       _next_eef    = _next_eef + body_iface_->leg_base(swing_leg_);
       Eigen::Vector3d _cf_eef = leg_ifaces_[LEGTYPE_CF(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_CF(swing_leg_));
       Eigen::Vector2d _last_cog = body_iface_->cog().head(2);
-      Eigen::Vector2d _next_cog(_last_cog.x() + 0.5*params_->FOOT_STEP, _last_cog.y());
+      Eigen::Vector2d _next_cog(_last_cog.x() + 0.5*wk_params_->FOOT_STEP, _last_cog.y());
       Eigen::Vector2d _cs(0.0, 0.0);
       if (LEGTYPE_IS_HIND(swing_leg_)) {
         _cs = geometry::cross_point(
@@ -277,11 +310,11 @@ void Walk::checkState() {
     }
 
     Eigen::Vector3d margins = stability_margin(swing_leg_);
-    if ((!swing_timer_->running()) && margins.minCoeff() >= params_->MARGIN_THRES) {
+    if ((!swing_timer_->running()) && margins.minCoeff() >= wk_params_->MARGIN_THRES) {
       LOG_WARNING << "STARTING...";
       ///! programming the swing trajectory.
       Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-      _next_eef.x()  = params_->FOOT_STEP;
+      _next_eef.x()  = wk_params_->FOOT_STEP;
       prog_eef_traj(_next_eef);
 
       swing_timer_->start();
@@ -304,9 +337,10 @@ void Walk::checkState() {
   {
     ///! the begin of WK_INIT_POS
     if (!timer_->running()) {
-      Eigen::Vector3d _tmp(0, 0, -params_->STANCE_HEIGHT);
+      // Eigen::Vector3d _tmp(0, 0, -params_->STANCE_HEIGHT);
       FOR_EACH_LEG(l) {
-        leg_ifaces_[l]->ik(_tmp, leg_cmds_[l]->target);
+        leg_cmd_eefs_[l] << 0.0, 0.0, -wk_params_->STANCE_HEIGHT;
+        // leg_ifaces_[l]->ik(_tmp, leg_cmds_[l]->target);
       }
 
       timer_->start();
@@ -318,7 +352,8 @@ void Walk::checkState() {
     timer_->stop(&_s_tmp_span);
     LOG_WARNING << "*******----INIT POSE OK!("
         << _s_tmp_span << "ms)----*******";
-    print_jnt_pos(JNTS_TARGET);
+    print_jnt_pos(/*JNTS_TARGET*/);
+    print_eef_pos();
 
     PRESS_THEN_GO
     ///! updating the following swing leg
@@ -413,7 +448,7 @@ void Walk::checkState() {
     PRESS_THEN_GO
 
     Eigen::Vector3d _fpt = eef_traj_->sample(1);
-    _fpt.z() -= 0.1*params_->SWING_HEIGHT;
+    _fpt.z() -= 0.1*wk_params_->SWING_HEIGHT;
     leg_ifaces_[swing_leg_]->ik(_fpt, leg_cmds_[swing_leg_]->target);
 
     ///! Every twice swing leg then adjusting COG.
@@ -465,14 +500,23 @@ void Walk::post_tick() {
 
   FOR_EACH_LEG(leg) {
     ///! Modify the target to keep the stance stability
-    if (!_s_is_hang && (swing_leg_ != leg)
-        && (LegState::TD_STATE != leg_ifaces_[leg]->leg_state())) {
-      stance_deltas_[leg] += params_->STANCE_DELTA;
-      stance_deltas_[leg]  = std::min(params_->STANCE_CEILING, stance_deltas_[leg]);
-      leg_cmds_[leg]->target.z() += stance_deltas_[leg];
+    if (!_s_is_hang && (swing_leg_ != leg)) {
+      Eigen::Vector3d _eef = leg_ifaces_[leg]->eef();
+
+      if (LegState::TD_STATE != leg_ifaces_[leg]->leg_state()) {
+        double diff = td_params_->TD_TARGET[leg] - leg_ifaces_[leg]->foot_force();
+
+        leg_cmd_eefs_[leg].z() = _eef.z() - td_params_->TD_KP*diff;
+        leg_cmd_eefs_[leg].z() = __clamp<double>(leg_cmd_eefs_[leg].z(),
+            -td_params_->STANCE_CEILING, -td_params_->STANCE_FLOOR);
+      } else {
+        leg_cmd_eefs_[leg].z() = _eef.z();
+      }
     }
 
-    leg_ifaces_[leg]->legTarget(*leg_cmds_[leg]);
+    leg_ifaces_[leg]->eefPositionTarget(leg_cmd_eefs_[leg]);
+//    leg_ifaces_[leg]->ik(leg_cmd_eefs_[leg], leg_cmds_[leg]->target);
+//    leg_ifaces_[leg]->legTarget(*leg_cmds_[leg]);
     leg_ifaces_[leg]->move();
   }
 
@@ -484,7 +528,7 @@ void Walk::post_tick() {
 //  if (current_state_ == WalkState::WK_SWING) {
 //    __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
 //  } else
-  print_jnt_pos(JNTS_TARGET);
+  print_jnt_pos(/*JNTS_TARGET*/);
   print_eef_pos();
 
 #ifdef RECORDER_EEF_TRAJ
@@ -521,8 +565,8 @@ void Walk::pose_init() {
 
 bool Walk::end_pose_init() {
   FOR_EACH_LEG(l) {
-    auto diff = (leg_ifaces_[l]->joint_position_const_ref()
-        - leg_cmds_[l]->target).norm();
+    auto diff = (leg_ifaces_[l]->eef()
+        - leg_cmd_eefs_[l]).norm();
     ///! The different of any leg is bigger than 0.1 is considered as
     ///! that the robot has not reach the initialization position.
     if (diff > 0.1) return false;
@@ -553,7 +597,7 @@ void Walk::move_cog() {
 
   FOR_EACH_LEG(l) {
     leg_ifaces_[l]->ik(
-        cog2eef_traj_[l]->sample((double)timer_->span()/params_->COG_TIME),
+        cog2eef_traj_[l]->sample((double)timer_->span()/wk_params_->COG_TIME),
         leg_cmds_[l]->target);
   }
 }
@@ -566,7 +610,7 @@ bool Walk::end_move_cog() {
 //  std::cout << "cog -> il-sl:  " << margins.y() << std::endl;
 //  std::cout << "cog -> il-dl:  " << margins.z() << std::endl;
 
-  return (margins.minCoeff() > params_->MARGIN_THRES);
+  return (margins.minCoeff() > wk_params_->MARGIN_THRES);
 }
 
 Eigen::Vector3d Walk::stability_margin(LegType sl) {
@@ -655,7 +699,7 @@ bool Walk::end_swing_leg() {
 //      : (std::abs(leg_ifaces_[LEGTYPE_SL(swing_leg_)]->eef().z() - leg_ifaces_[swing_leg_]->eef().z()) < 0.1) ) );
 
   ///! for rviz
-  return ((LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) || (timer_->span() > 2*params_->SWING_TIME));
+  return ((LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) || (timer_->span() > 2*wk_params_->SWING_TIME));
 
 }
 
@@ -665,22 +709,37 @@ void Walk::walk() {
     return;
 
   if (swing_timer_->running()) {
-    leg_ifaces_[swing_leg_]->ik(
-        eef_traj_->sample(swing_timer_->span()/1000.0), leg_cmds_[swing_leg_]->target);
+//    double _dt = swing_timer_->span()/1000.0;
+//    if (_dt >= eef_traj_->ceiling()) {
+//      Eigen::Vector3d _eef = leg_ifaces_[swing_leg_]->eef();
+//
+//      if (LegState::TD_STATE != leg_ifaces_[swing_leg_]->leg_state()) {
+//        double diff = td_params_->TD_TARGET[swing_leg_] - leg_ifaces_[swing_leg_]->foot_force();
+//
+//        leg_cmd_eefs_[swing_leg_].z() = _eef.z() - td_params_->TD_KP*diff;
+//        leg_cmd_eefs_[swing_leg_].z() = __clamp<double>(leg_cmd_eefs_[swing_leg_].z(),
+//            -td_params_->STANCE_CEILING, -td_params_->STANCE_FLOOR);
+//      }
+//    } else {
+      leg_cmd_eefs_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
+//    }
   }
 
   FOR_EACH_LEG(l) {
     if (!swing_timer_->running() || swing_leg_ != l) {
-      leg_ifaces_[l]->ik(
-          cog2eef_traj_[l]->sample((double)timer_->span()/params_->COG_TIME),
-          leg_cmds_[l]->target);
+      leg_cmd_eefs_[l] = cog2eef_traj_[l]->sample((double)timer_->span()/wk_params_->COG_TIME);
+//      leg_ifaces_[l]->ik(
+//          cog2eef_traj_[l]->sample((double)timer_->span()/params_->COG_TIME),
+//          leg_cmds_[l]->target);
     }
   }
 }
 
 bool Walk::end_walk() {
-  return ((timer_->span() >= /*2**/params_->COG_TIME)
-            && swing_timer_->span() >= 2000/*eef_traj_->ceiling()*/);
+//  if (_s_is_hang) {
+    return ((timer_->span() >= /*2**/wk_params_->COG_TIME)
+              && swing_timer_->span() >= 2000/*eef_traj_->ceiling()*/);
+//  }
 }
 
 // TODO
@@ -691,7 +750,7 @@ void Walk::stance() {
 }
 
 bool Walk::end_stance() {
-  Eigen::Vector3d _tmp(0.0, 0.0, params_->STANCE_HEIGHT);
+  Eigen::Vector3d _tmp(0.0, 0.0, wk_params_->STANCE_HEIGHT);
   // ;
   FOR_EACH_LEG(l) {
     auto diff  = (cog2eef_traj_[l]->sample(1) - leg_ifaces_[l]->eef()).norm();
@@ -710,21 +769,21 @@ void Walk::prog_eef_traj(const Eigen::Vector3d& _next_fpt) {
   // Eigen::Vector3d _next_fpt = prog_next_fpt(swing_leg_);
 
   Eigen::Vector3d _rise_fpt = _last_fpt;
-  _rise_fpt.z() = _last_fpt.z() + 0.5*params_->SWING_HEIGHT;
+  _rise_fpt.z() = _last_fpt.z() + 0.5*wk_params_->SWING_HEIGHT;
 
   Eigen::Vector3d _appr_fpt = _next_fpt;
-  _appr_fpt.z() = _next_fpt.z() + 0.5*params_->SWING_HEIGHT;
+  _appr_fpt.z() = _next_fpt.z() + 0.5*wk_params_->SWING_HEIGHT;
 
   Eigen::Vector3d _top_fpt(
       (_rise_fpt.x()/2 + _appr_fpt.x()/2),
       (_rise_fpt.y()/2 + _appr_fpt.y()/2),
-      (_last_fpt.z() + params_->SWING_HEIGHT));
+      (_last_fpt.z() + wk_params_->SWING_HEIGHT));
 
   SegTraj3dSp swing_traj(new SegTraj3d);
   double _t0 = 0;
-  double _t1 = _t0 + params_->SWING_RISE;
-  double _t3 = _t1 + params_->SWING_APPROACH;
-  double _t4 = _t3 + params_->SWING_DROP;
+  double _t1 = _t0 + wk_params_->SWING_RISE;
+  double _t3 = _t1 + wk_params_->SWING_APPROACH;
+  double _t4 = _t3 + wk_params_->SWING_DROP;
   double _t2 = 0.5*(_t1 + _t3);
   Eigen::MatrixXd A, b, x;
   Eigen::VectorXd row;
@@ -867,26 +926,27 @@ Eigen::Vector3d Walk::prog_next_fpt(LegType _fsl) {
   if (LegType::UNKNOWN_LEG != _other_leg)
     _other_fpt = leg_ifaces_[_other_leg]->eef();
 
-  if (std::abs(_other_fpt.x() - _last_fpt.x()) > 0.5*params_->FOOT_STEP) {
-    _next_fpt.x() = _other_fpt.x() + params_->FOOT_STEP;
+  if (std::abs(_other_fpt.x() - _last_fpt.x()) > 0.5*wk_params_->FOOT_STEP) {
+    _next_fpt.x() = _other_fpt.x() + wk_params_->FOOT_STEP;
   } else {
-    _next_fpt.x() += params_->FOOT_STEP;
+    _next_fpt.x() += wk_params_->FOOT_STEP;
     // _next_fpt.y()  = _last_fpt.y() + std::abs(_next_fpt.x() - _last_fpt.x()) * tan(params_->FORWARD_ALPHA);
   }
-  _next_fpt.y()  = _last_fpt.y() + std::abs(_next_fpt.x() - _last_fpt.x()) * tan(params_->FORWARD_ALPHA);
+  _next_fpt.y()  = _last_fpt.y() + std::abs(_next_fpt.x() - _last_fpt.x()) * tan(wk_params_->FORWARD_ALPHA);
   _next_fpt.z() = _last_fpt.z()/* + 0.3*params_->SWING_HEIGHT*/;
 
   return _next_fpt;
 }
 
 void Walk::prog_cog_traj(const Eigen::Vector2d& _next_cog) {
-  Eigen::Vector3d _p0(0.0, 0.0, -params_->STANCE_HEIGHT);
-  Eigen::Vector3d _p1(0.0, 0.0, -params_->STANCE_HEIGHT);
+  Eigen::Vector3d _p0(0.0, 0.0, -wk_params_->STANCE_HEIGHT);
+  Eigen::Vector3d _p1(0.0, 0.0, -wk_params_->STANCE_HEIGHT);
   // Eigen::Vector2d _tmp_next_cog = prog_next_cog(swing_leg_);
 
   FOR_EACH_LEG(l) {
     _p0 = leg_ifaces_[l]->eef();
     _p1.head(2) = _p0.head(2) - _next_cog.head(2);
+    _p1.tail(1) = _p0.tail(1);
 
     Eigen::MatrixXd A;
     A.resize(4, 4);

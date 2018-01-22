@@ -21,7 +21,7 @@
 #include "adt/discrete.h"
 #endif
 
-#define PUB_ROS_TOPIC
+// #define PUB_ROS_TOPIC
 #ifdef PUB_ROS_TOPIC
 #include <ros/ros.h>
 #include <boost/scoped_ptr.hpp>
@@ -164,8 +164,12 @@ protected:
   class RobotLeg*       leg_ifaces_[LegType::N_LEGS];
   ///! The commands of legs.
   class LegTarget*      leg_cmds_[LegType::N_LEGS];
-  ///! Variables about gait control
-  class WalkParam*      params_;
+  ///! The end-effector command.
+  Eigen::Vector3d       leg_cmd_eefs_[LegType::N_LEGS];
+  ///! parameters for gait control
+  class WalkParam*      wk_params_;
+  ///! parameters for touchdown control
+  class TdParam*        td_params_;
 
   ///! The time control. this TimeControl will be started in the begin of
   ///! each state, stopped in the end of each state.
