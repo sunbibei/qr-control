@@ -24,6 +24,8 @@
 
 namespace qr_control {
 
+bool _s_is_hang = false;
+
 #define JNTS_TARGET \
     leg_cmds_[LegType::FL]->target, \
     leg_cmds_[LegType::FR]->target, \
@@ -62,13 +64,15 @@ struct WalkParam {
   double   SWING_DROP;
   ///! The minmum stablity margin could to swing leg.
   double   MARGIN_THRES;
+  ///! The minmum delta to keep the robot stance.
+  double   STANCE_DELTA;
 
   WalkParam(const MiiString& _tag)
     : THRES_COG(6.5),    FOOT_STEP(10),
       STANCE_HEIGHT(46), SWING_HEIGHT(5),
       FORWARD_ALPHA(0),  STOP_HEIGHT_SCALE(0.3),
       COG_TIME(2000),    SWING_TIME(2000),
-      MARGIN_THRES(6) {
+      MARGIN_THRES(6),   STANCE_DELTA(0.1) {
     auto cfg = MiiCfgReader::instance();
     cfg->get_value(_tag, "cog_threshold",THRES_COG);
     cfg->get_value(_tag, "step",         FOOT_STEP);
@@ -85,6 +89,7 @@ struct WalkParam {
     cfg->get_value(_tag, "swing_drop",     SWING_DROP);
 
     cfg->get_value(_tag, "margin_threshold", MARGIN_THRES);
+    cfg->get_value(_tag, "stance_delta",     STANCE_DELTA);
   }
 };
 
@@ -162,6 +167,7 @@ bool Walk::init() {
 
   auto cfg = MiiCfgReader::instance();
   // cfg->get_value(getLabel(), "hang",     is_hang_walk_);
+  cfg->get_value(getLabel(), "hang",     _s_is_hang);
   cfg->get_value(getLabel(), "interval", post_tick_interval_);
 
   MiiString _tag = Label::make_label(getLabel(), "coefficient");
@@ -232,24 +238,39 @@ void Walk::checkState() {
   {
     if (!timer_->running()) {
       ///! programming the swing trajectory.
-      auto _next_eef = leg_ifaces_[swing_leg_]->eef();
+      Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
       // double _translation = params_->FOOT_STEP - _next_eef.x();
       _next_eef.x()  = params_->FOOT_STEP;
       prog_eef_traj(_next_eef);
 
       ///! propgraming the CoG trajectory.
-      auto _cf_eef = leg_ifaces_[LEGTYPE_CF(swing_leg_)]->eef();
-      auto _ch_eef = leg_ifaces_[LEGTYPE_CH(swing_leg_)]->eef();
+      // LegType _cf = LEGTYPE_CF(swing_leg_);
+//      std::cout << "NF:  " << _next_eef.transpose() << std::endl;
+//      std::cout << "NFB: " << body_iface_->leg_base(swing_leg_).transpose() << std::endl;
+//      std::cout << "CF:  " << leg_ifaces_[LEGTYPE_CF(swing_leg_)]->eef().transpose() << std::endl;
+//      std::cout << "CFB: " << body_iface_->leg_base(LEGTYPE_CF(swing_leg_)).transpose() << std::endl;
+      _next_eef    = _next_eef + body_iface_->leg_base(swing_leg_);
+      Eigen::Vector3d _cf_eef = leg_ifaces_[LEGTYPE_CF(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_CF(swing_leg_));
+      // auto _ch_eef = leg_ifaces_[LEGTYPE_CH(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_CH(swing_leg_));
       Eigen::Vector2d _last_cog = body_iface_->cog().head(2);
       Eigen::Vector2d _next_cog(_last_cog.x() + 0.5*params_->FOOT_STEP, _last_cog.y());
       Eigen::Vector2d _cs(0.0, 0.0);
       if (LEGTYPE_IS_HIND(swing_leg_)) {
+//        std::cout << "CF: " << _cf_eef.head(2).transpose()   << std::endl;
+//        std::cout << "NF: " << _next_eef.head(2).transpose() << std::endl;
+//        std::cout << "LC: " << _last_cog.head(2).transpose() << std::endl;
+//        std::cout << "NC: " << _next_cog.head(2).transpose() << std::endl;
         _cs = geometry::cross_point(
             geometry::linear(_cf_eef.head(2), _next_eef.head(2)),
             geometry::linear(_next_cog, _last_cog));
         _next_cog = (_cs + _last_cog) * 0.5;
       } else {
-        auto _il_eef = leg_ifaces_[LEGTYPE_IL(swing_leg_)]->eef();
+        // LegType _il = LEGTYPE_IL(swing_leg_);
+        Eigen::Vector3d _il_eef = leg_ifaces_[LEGTYPE_IL(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_IL(swing_leg_));
+//        std::cout << "CF: " << _cf_eef.head(2).transpose()   << std::endl;
+//        std::cout << "IL: " << _il_eef.head(2).transpose()   << std::endl;
+//        std::cout << "LC: " << _last_cog.head(2).transpose() << std::endl;
+//        std::cout << "NC: " << _next_cog.head(2).transpose() << std::endl;
         _cs = geometry::cross_point(
             geometry::linear(_cf_eef.head(2), _il_eef.head(2)),
             geometry::linear(_next_cog, _last_cog));
@@ -439,14 +460,20 @@ void Walk::post_tick() {
   _s_sum_interval = 0;
 
   FOR_EACH_LEG(leg) {
+    ///! Modify the target to keep the stance stability
+    if (!_s_is_hang && (swing_leg_ != leg)
+        && (LegState::TD_STATE != leg_ifaces_[leg]->leg_state())) {
+      leg_cmds_[leg]->target.z() += params_->STANCE_DELTA;
+    }
+
     leg_ifaces_[leg]->legTarget(*leg_cmds_[leg]);
     leg_ifaces_[leg]->move();
   }
 
   Eigen::Vector3d margins = stability_margin(swing_leg_);
-  std::cout << "cog -> cf-ch:" << margins.x() << std::endl;
-  std::cout << "cog -> il-sl:" << margins.y() << std::endl;
-  std::cout << "cog -> il-dl:" << margins.z() << std::endl;
+  LOG_WARNING << "cog -> cf-ch:" << margins.x();
+  LOG_WARNING << "cog -> il-sl:" << margins.y();
+  LOG_WARNING << "cog -> il-dl:" << margins.z();
 
 //  if (current_state_ == WalkState::WK_SWING) {
 //    __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
