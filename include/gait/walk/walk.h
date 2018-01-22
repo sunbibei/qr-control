@@ -170,12 +170,15 @@ protected:
   ///! The time control. this TimeControl will be started in the begin of
   ///! each state, stopped in the end of each state.
   TimeControl*     timer_;
+  ///! The time control. this TimeControl is used to decide when to swing the leg.
+  TimeControl*     swing_timer_;
 
   ///! The trajectory for swing leg
   Traj3dSp         eef_traj_;
   ///! The trajectory for moving COG
   Traj3dSp         cog2eef_traj_[LegType::N_LEGS];
-
+  ///! The stance modify deltas
+  double           stance_deltas_[LegType::N_LEGS];
   ///! The following swing leg, it indicates the following swing leg at any time.
   LegType          swing_leg_;
   ///! The Control tick interval for send command(in ms)
