@@ -314,11 +314,13 @@ void Walk::checkState() {
     }
 
     Eigen::Vector3d margins = stability_margin(swing_leg_);
-    if ((!swing_timer_->running()) && margins.minCoeff() >= wk_params_->MARGIN_THRES) {
+    if ((!swing_timer_->running()) && 
+          ((margins.minCoeff() >= wk_params_->MARGIN_THRES)
+            || (timer_->span() >= wk_params_->COG_TIME))) {
       LOG_WARNING << "STARTING...";
       ///! programming the swing trajectory.
       Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-      _next_eef.head(2)  << wk_params_->FOOT_STEP, 0;
+      _next_eef.head(2) << wk_params_->FOOT_STEP, 0;
       prog_eef_traj(_next_eef);
 
       swing_timer_->start();
@@ -565,7 +567,8 @@ void Walk::post_tick() {
 
 void Walk::pose_init() {
   // Nothing to do here.
-  print_eef_pos();
+  print_eef_pos(leg_cmd_eefs_[LegType::FL], leg_cmd_eefs_[LegType::FR],
+    leg_cmd_eefs_[LegType::HL], leg_cmd_eefs_[LegType::HR]);
 }
 
 bool Walk::end_pose_init() {
@@ -574,7 +577,7 @@ bool Walk::end_pose_init() {
         - leg_cmd_eefs_[l]).norm();
     ///! The different of any leg is bigger than 0.1 is considered as
     ///! that the robot has not reach the initialization position.
-    if (diff > 0.1) return false;
+    if (diff > 0.2) return false;
   }
   return true;
 }
