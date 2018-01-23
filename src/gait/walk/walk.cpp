@@ -276,9 +276,10 @@ void Walk::checkState() {
   case WalkState::WK_WALK:
   {
     if (!timer_->running()) {
+      static bool _s_is_first = true;
       ///! programming the swing trajectory.
       Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-      _next_eef.head(2)  << wk_params_->FOOT_STEP, 0;
+      _next_eef.x() = wk_params_->FOOT_STEP;
       // prog_eef_traj(_next_eef);
 
       ///! propgraming the CoG trajectory.
@@ -292,7 +293,10 @@ void Walk::checkState() {
             geometry::linear(_cf_eef.head(2), _next_eef.head(2)),
             geometry::linear(_next_cog, _last_cog));
         _next_cog     = (_cs + _last_cog) * 0.5;
-        _next_cog.y() = _cf_eef.y() * 0.15;
+        if (_s_is_first) {
+          _next_cog.y() = _cf_eef.y() * 0.2;
+          _s_is_first = false;
+        }
       } else {
         // LegType _il = LEGTYPE_IL(swing_leg_);
         Eigen::Vector3d _il_eef = leg_ifaces_[LEGTYPE_IL(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_IL(swing_leg_));
@@ -512,10 +516,6 @@ void Walk::post_tick() {
         } else {
           leg_cmd_eefs_[leg].z() = _eef.z();
         }
-      } else { ///! swing_leg_ == leg
-        if (LegState::TD_STATE == leg_ifaces_[leg]->leg_state()) {
-          leg_cmd_eefs_[leg] = _eef;
-        }
       }
     }
 
@@ -714,20 +714,11 @@ void Walk::walk() {
     return;
 
   if (swing_timer_->running()) {
-//    double _dt = swing_timer_->span()/1000.0;
-//    if (_dt >= eef_traj_->ceiling()) {
-//      Eigen::Vector3d _eef = leg_ifaces_[swing_leg_]->eef();
-//
-//      if (LegState::TD_STATE != leg_ifaces_[swing_leg_]->leg_state()) {
-//        double diff = td_params_->TD_TARGET[swing_leg_] - leg_ifaces_[swing_leg_]->foot_force();
-//
-//        leg_cmd_eefs_[swing_leg_].z() = _eef.z() - td_params_->TD_KP*diff;
-//        leg_cmd_eefs_[swing_leg_].z() = __clamp<double>(leg_cmd_eefs_[swing_leg_].z(),
-//            -td_params_->STANCE_CEILING, -td_params_->STANCE_FLOOR);
-//      }
-//    } else {
+    double _dt = swing_timer_->span()/1000.0;
+    if ((_dt >= 0.8*eef_traj_->ceiling()) && (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()))
+      leg_cmd_eefs_[swing_leg_] = leg_ifaces_[swing_leg_]->eef();
+    else
       leg_cmd_eefs_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
-//    }
   }
 
   FOR_EACH_LEG(l) {
