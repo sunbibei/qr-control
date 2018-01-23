@@ -176,6 +176,8 @@ protected:
   TimeControl*     timer_;
   ///! The time control. this TimeControl is used to decide when to swing the leg.
   TimeControl*     swing_timer_;
+  ///! The time control. this TimeControl is used to decide when to move the cog.
+  TimeControl*     cog_timer_;
 
   ///! The trajectory for swing leg
   Traj3dSp         eef_traj_;

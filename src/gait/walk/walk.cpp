@@ -128,7 +128,7 @@ Walk::Walk()
   : current_state_(WalkState::UNKNOWN_WK_STATE),
     body_iface_(nullptr),
     wk_params_(nullptr), td_params_(nullptr),
-    timer_(nullptr), swing_timer_(nullptr),
+    timer_(nullptr), swing_timer_(nullptr), cog_timer_(nullptr),
     eef_traj_(nullptr), swing_leg_(LegType::UNKNOWN_LEG),
     post_tick_interval_(50)
 {
@@ -229,6 +229,7 @@ bool Walk::starting() {
   ///! initialize the TimeControl
   timer_       = new TimeControl;
   swing_timer_ = new TimeControl;
+  cog_timer_   = new TimeControl;
 
   eef_traj_.reset(new SegTraj3d);
   for (auto& t : cog2eef_traj_)
@@ -261,6 +262,8 @@ void Walk::stopping() {
   timer_ = nullptr;
   delete swing_timer_;
   swing_timer_ = nullptr;
+  delete cog_timer_;
+  cog_timer_   = nullptr;
 
   delete state_machine_;
   state_machine_ = nullptr;
@@ -316,7 +319,7 @@ void Walk::checkState() {
     Eigen::Vector3d margins = stability_margin(swing_leg_);
     if ((!swing_timer_->running()) && 
           ((margins.minCoeff() >= wk_params_->MARGIN_THRES)
-            || (timer_->span() >= wk_params_->COG_TIME))) {
+            || (cog_timer_->span() >= wk_params_->COG_TIME))) {
       LOG_WARNING << "STARTING...";
       ///! programming the swing trajectory.
       Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
@@ -324,6 +327,13 @@ void Walk::checkState() {
       prog_eef_traj(_next_eef);
 
       swing_timer_->start();
+    }
+    if (!cog_timer_->running()) {
+      if (LEGTYPE_IS_HIND(swing_leg_))
+        cog_timer_->start();
+
+      if ((LEGTYPE_IS_FRONT(swing_leg_)) && (swing_timer_->span() >= 1000))
+        cog_timer_->start();
     }
 
     if (!end_walk()) return;
@@ -333,6 +343,7 @@ void Walk::checkState() {
     LOG_WARNING << "*******----WALK ONE-STEP OK!("
         << _s_tmp_span << "ms)----*******";
     swing_timer_->stop();
+    cog_timer_->stop();
 
     PRESS_THEN_GO
     ///! updating the following swing leg
@@ -724,19 +735,22 @@ void Walk::walk() {
       leg_cmd_eefs_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
   }
 
-  FOR_EACH_LEG(l) {
-    if (!swing_timer_->running() || swing_leg_ != l) {
-      leg_cmd_eefs_[l] = cog2eef_traj_[l]->sample((double)timer_->span()/wk_params_->COG_TIME);
-//      leg_ifaces_[l]->ik(
-//          cog2eef_traj_[l]->sample((double)timer_->span()/params_->COG_TIME),
-//          leg_cmds_[l]->target);
+  if (cog_timer_->running()) {
+    FOR_EACH_LEG(l) {
+      if (!swing_timer_->running() || swing_leg_ != l) {
+        leg_cmd_eefs_[l] = cog2eef_traj_[l]->sample((double)cog_timer_->span()/wk_params_->COG_TIME);
+  //      leg_ifaces_[l]->ik(
+  //          cog2eef_traj_[l]->sample((double)timer_->span()/params_->COG_TIME),
+  //          leg_cmds_[l]->target);
+      }
     }
   }
+
 }
 
 bool Walk::end_walk() {
 //  if (_s_is_hang) {
-    return ((timer_->span() >= /*2**/wk_params_->COG_TIME)
+    return ((cog_timer_->span() >= /*2**/wk_params_->COG_TIME)
               && swing_timer_->span() >= 2000/*eef_traj_->ceiling()*/);
 //  }
 }
