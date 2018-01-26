@@ -308,7 +308,7 @@ void Creep::swing_hind() {
   if (!timer_->running()) {
     ///! programming the next fpt.
     Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-    _next_eef.x() = cp_params_->FOOT_STEP;
+    _next_eef.x() = 1.5*cp_params_->FOOT_STEP;
     _next_eef.y() = (LEGTYPE_IS_LEFT(swing_leg_)) ?
                        cp_params_->FOOT_STEP_Y : -cp_params_->FOOT_STEP_Y;
 
@@ -340,7 +340,7 @@ void Creep::swing_hind() {
       ///! programming the swing trajectory.
       LOG_WARNING << "STARTING...";
       Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-      _next_eef.x() = cp_params_->FOOT_STEP;
+      _next_eef.x() = 1.5*cp_params_->FOOT_STEP;
       _next_eef.y() = (LEGTYPE_IS_LEFT(swing_leg_)) ?
                          cp_params_->FOOT_STEP_Y : -cp_params_->FOOT_STEP_Y;
       prog_eef_traj(_next_eef);
@@ -402,7 +402,7 @@ void Creep::swing_front() {
     prog_cog_traj(_next_cog);
     ///! start the timer
     timer_->start();
-    cog_timer_->start();
+    // cog_timer_->start();
     swing_timer_->start();
   }
 
