@@ -315,15 +315,22 @@ void Creep::swing_hind() {
     ///! propgraming the CoG trajectory.
     _next_eef    = _next_eef + body_iface_->leg_base(swing_leg_);
     Eigen::Vector3d _cf_eef = leg_ifaces_[LEGTYPE_CF(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_CF(swing_leg_));
+    Eigen::Vector3d _ch_eef = leg_ifaces_[LEGTYPE_CH(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_CH(swing_leg_));
+    Eigen::Vector3d _il_eef = leg_ifaces_[LEGTYPE_IL(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_IL(swing_leg_));
 
-    Eigen::Vector2d _last_cog = body_iface_->cog().head(2);
-    Eigen::Vector2d _next_cog(_last_cog.x() + 0.5*cp_params_->FOOT_STEP, _last_cog.y());
     Eigen::Vector2d _cs = geometry::cross_point(
         geometry::linear(_cf_eef.head(2), _next_eef.head(2)),
-        geometry::linear(_next_cog, _last_cog));
+        geometry::linear(_il_eef.head(2), _ch_eef.head(2)));
+    Eigen::Vector2d _next_cog = geometry::incenter_of_triangle(_cs, _cf_eef.head(2), _ch_eef.head(2));
 
-    _next_cog     = (_cs + _last_cog) * 0.5;
-    _next_cog.y() = _cf_eef.y() * 0.3;
+//    Eigen::Vector2d _last_cog = body_iface_->cog().head(2);
+//    Eigen::Vector2d _next_cog(_last_cog.x() + 0.5*cp_params_->FOOT_STEP, _last_cog.y());
+//    Eigen::Vector2d _cs = geometry::cross_point(
+//        geometry::linear(_cf_eef.head(2), _next_eef.head(2)),
+//        geometry::linear(_next_cog, _last_cog));
+//
+//    _next_cog     = (_cs + _last_cog) * 0.5;
+//    _next_cog.y() = _cf_eef.y() * 0.3;
     LOG_WARNING << "NEXT COG: " << _next_cog.transpose();
 
     prog_cog_traj(_next_cog);
