@@ -44,7 +44,7 @@ Eigen::Vector3d QrBody::velocity() {
 ///! The centre of gravity of robot
 Eigen::Vector3d QrBody::cog() {
   // LOG_ERROR << "Call the 'translation' which has does not complemented.";
-  return Eigen::Vector3d(0.0, 0.0, 0.0);
+  return Eigen::Vector3d(2.0, 0.0, 0.0);
 }
 
 ///! The translation of LegType shoulder(leg_base frame) of robot against the world frame.

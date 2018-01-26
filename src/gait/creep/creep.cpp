@@ -155,7 +155,7 @@ void Creep::checkState() {
   {
     FOR_EACH_LEG(l) {
       auto diff = (leg_ifaces_[l]->eef() - eef_cmds_[l]).norm();
-      if (diff > 0.1) return;
+      if (diff > 0.3) return;
     }
 
     ///! the end of WK_INIT_POS
@@ -183,7 +183,7 @@ void Creep::checkState() {
     ///! the end of WK_INIT_POS
     timer_->stop(&_s_tmp_span);
     LOG_WARNING << "*******----SWING " << LEGTYPE_TOSTRING(swing_leg_)
-        << " HAS FINISHED!(" << _s_tmp_span << "ms)----*******";
+        << " (" << _s_tmp_span << "ms)----*******";
 
     PRESS_THEN_GO
     ///! updating the following swing leg
@@ -213,7 +213,7 @@ void Creep::post_tick() {
       if (swing_leg_ != leg) {
         if (LegState::TD_STATE != leg_ifaces_[leg]->leg_state()) {
           // TODO
-          eef_cmds_[leg].z() = boost::algorithm::clamp(_eef.z() - 0.1,
+          eef_cmds_[leg].z() = boost::algorithm::clamp(_eef.z() - 0.3,
               -cp_params_->STANCE_HEIGHT - 2, -cp_params_->STANCE_HEIGHT + 2);
         } else {
           eef_cmds_[leg].z() = _eef.z();
@@ -229,9 +229,9 @@ void Creep::post_tick() {
   print_eef_pos();
 
   Eigen::Vector3d margins = stability_margin(swing_leg_);
-  LOG_WARNING << "cog -> cf-ch:" << margins.x();
-  LOG_WARNING << "cog -> il-sl:" << margins.y();
-  LOG_WARNING << "cog -> il-dl:" << margins.z();
+  // LOG_WARNING << "cog -> cf-ch:" << margins.x();
+  // LOG_WARNING << "cog -> il-sl:" << margins.y();
+  // LOG_WARNING << "cog -> il-dl:" << margins.z();
 }
 
 void Creep::pose_init() {
@@ -242,6 +242,9 @@ void Creep::pose_init() {
 
     timer_->start();
   }
+
+  print_eef_pos(eef_cmds_[LegType::FL], eef_cmds_[LegType::FR],
+        eef_cmds_[LegType::HL], eef_cmds_[LegType::HR]);
 }
 
 void Creep::ready() {
@@ -302,6 +305,7 @@ void Creep::swing_hind() {
         || (!cog_timer_->running())
         || (cog_timer_->span() >= 0.8*cp_params_->COG_TIME)) {
       ///! programming the swing trajectory.
+      LOG_WARNING << "STARTING...";
       Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
       _next_eef.head(2) << cp_params_->FOOT_STEP, 0;
       prog_eef_traj(_next_eef);
@@ -359,16 +363,20 @@ void Creep::swing_front() {
 
   if (cog_timer_->running()) {
     Eigen::Vector3d margins = stability_margin(swing_leg_);
+    LOG_WARNING << "cog -> cf-ch:" << margins.x();
+    LOG_WARNING << "cog -> il-sl:" << margins.y();
+    LOG_WARNING << "cog -> il-dl:" << margins.z();
+    LOG_WARNING << "threshold:   " << cp_params_->MARGIN_THRES;
     if ((margins.minCoeff() <= cp_params_->MARGIN_THRES)
          || !swing_timer_->running()) {
+      LOG_WARNING << "STOP...";
       cog_timer_->stop();
     }
   }
 
   ///! If the swing_timer is running, control the swing leg.
   if (swing_timer_->running()) {
-    double _dt = swing_timer_->span()/1000.0;
-    if ((_dt >= 0.8*eef_traj_->ceiling()) && (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()))
+    if ((swing_timer_->span() >= 0.8*cp_params_->SWING_TIME) && (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()))
       eef_cmds_[swing_leg_] = leg_ifaces_[swing_leg_]->eef();
     else
       eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
