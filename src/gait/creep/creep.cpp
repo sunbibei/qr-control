@@ -214,7 +214,7 @@ void Creep::post_tick() {
         if (LegState::TD_STATE != leg_ifaces_[leg]->leg_state()) {
           // TODO
           eef_cmds_[leg].z() = boost::algorithm::clamp(_eef.z() - 0.3,
-              -cp_params_->STANCE_HEIGHT - 2, -cp_params_->STANCE_HEIGHT + 2);
+              -cp_params_->STANCE_HEIGHT - 10, -cp_params_->STANCE_HEIGHT + 10);
         } else {
           eef_cmds_[leg].z() = _eef.z();
         }
@@ -307,7 +307,8 @@ void Creep::swing_hind() {
       ///! programming the swing trajectory.
       LOG_WARNING << "STARTING...";
       Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-      _next_eef << cp_params_->FOOT_STEP, 0, -cp_params_->STANCE_HEIGHT - 5;
+      _next_eef.head(2) << cp_params_->FOOT_STEP, 0;
+      // _next_eef << cp_params_->FOOT_STEP, 0, -cp_params_->STANCE_HEIGHT - 5;
       prog_eef_traj(_next_eef);
 
       swing_timer_->start();
@@ -340,7 +341,7 @@ void Creep::swing_front() {
     Eigen::Vector3d _il_eef = leg_ifaces_[LEGTYPE_IL(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_IL(swing_leg_));
     ///! programming the next fpt.
     Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-    _next_eef << cp_params_->FOOT_STEP, 0, -cp_params_->STANCE_HEIGHT - 5;
+    _next_eef.head(2) << cp_params_->FOOT_STEP, 0;
     prog_eef_traj(_next_eef);
 
     ///! propgraming the CoG trajectory.
