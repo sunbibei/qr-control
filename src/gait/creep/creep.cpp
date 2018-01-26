@@ -18,8 +18,10 @@
 namespace qr_control {
 
 struct CreepParams {
-  ///! The foot step
+  ///! The foot step in x-direction
   double FOOT_STEP;
+  ///! The foot step in y-direction
+  double FOOT_STEP_Y;
   ///! The height value when the robot stay stance.
   double STANCE_HEIGHT;
   ///! The height value when swing leg.
@@ -39,12 +41,13 @@ struct CreepParams {
   double   MARGIN_THRES;
 
   CreepParams(const MiiString& _tag)
-    : FOOT_STEP(10),
+    : FOOT_STEP(10),     FOOT_STEP_Y(0),
       STANCE_HEIGHT(46), SWING_HEIGHT(5),
       COG_TIME(2000),    SWING_TIME(2000),
       MARGIN_THRES(6) {
     auto cfg = MiiCfgReader::instance();
     cfg->get_value(_tag, "step",         FOOT_STEP);
+    cfg->get_value(_tag, "step_y",       FOOT_STEP_Y);
     cfg->get_value(_tag, "stance_height",STANCE_HEIGHT);
     cfg->get_value(_tag, "swing_height", SWING_HEIGHT);
 
@@ -165,14 +168,34 @@ void Creep::checkState() {
         eef_cmds_[LegType::HL], eef_cmds_[LegType::HR]);
 
     PRESS_THEN_GO
-    ///! updating the following swing leg
-    swing_leg_     = next_leg(swing_leg_);
-    // current_state_ = WalkState::WK_MOVE_COG;
-    current_state_ = CreepState::CP_SWING_HIND;
+    if (is_hang_) {
+      ///! updating the following swing leg
+      swing_leg_     = next_leg(swing_leg_);
+      current_state_ = (LEGTYPE_IS_FRONT(swing_leg_) ?
+              CreepState::CP_SWING_FRONT : CreepState::CP_SWING_HIND);
+    } else {
+      current_state_ = CreepState::CP_READY;
+    }
+
     break;
   }
   case CreepState::CP_READY:
   {
+    if (!end_ready()) return;
+    ///! the end of WK_INIT_POS
+    timer_->stop(&_s_tmp_span);
+    LOG_WARNING << "*******----READY " << " (" << _s_tmp_span << "ms)----*******";
+
+    FOR_EACH_LEG(l) {
+      balance_fpts_(l) = leg_ifaces_[l]->eef().z();
+    }
+
+    LOG_WARNING << "ready: " << balance_fpts_.transpose();
+    PRESS_THEN_GO
+    ///! updating the following swing leg
+    swing_leg_     = next_leg(swing_leg_);
+    current_state_ = (LEGTYPE_IS_FRONT(swing_leg_) ?
+            CreepState::CP_SWING_FRONT : CreepState::CP_SWING_HIND);
     break;
   }
   case CreepState::CP_SWING_HIND:
@@ -197,6 +220,10 @@ void Creep::checkState() {
   }
 }
 
+inline int __sign(double t) {
+  return (t < 0) ? -1 : 1;
+}
+
 
 void Creep::post_tick() {
   ///! The command frequency control
@@ -208,16 +235,29 @@ void Creep::post_tick() {
 
   FOR_EACH_LEG(leg) {
     ///! Modify the target to keep the stance stability
-    if (!is_hang_) {
+    if (!is_hang_ && CreepState::CP_INIT_POSE != current_state_
+        && CreepState::CP_READY != current_state_) {
       Eigen::Vector3d _eef = leg_ifaces_[leg]->eef();
-      if (swing_leg_ != leg) {
-        if (LegState::TD_STATE != leg_ifaces_[leg]->leg_state()) {
-          // TODO
-          eef_cmds_[leg].z() = boost::algorithm::clamp(_eef.z() - 0.3,
-              -cp_params_->STANCE_HEIGHT - 2, -cp_params_->STANCE_HEIGHT + 2);
+      if (LegState::TD_STATE != leg_ifaces_[leg]->leg_state()) {
+        if ((swing_leg_ != leg) || (!swing_timer_->running())) {
+          ///! When the moving CoG and not to swing leg yet.
+          eef_cmds_[leg].z() = boost::algorithm::clamp(
+              _eef.z() - 0.5,
+              -cp_params_->STANCE_HEIGHT - 10, -cp_params_->STANCE_HEIGHT + 5);
         } else {
-          eef_cmds_[leg].z() = _eef.z();
+          ;// Nothing to do here.
         }
+      } else {
+        double diff = balance_fpts_(leg) - _eef.z();
+        if (std::abs(diff) > 0.5) {
+          eef_cmds_[leg].z() = _eef.z() + __sign(diff) * 0.5;
+        }
+      }
+
+      if ((swing_leg_ != leg) && (LegState::TD_STATE != leg_ifaces_[leg]->leg_state())) {
+        ;
+      } else { // else if LegState::TD_STATE == leg_ifaces_[leg]->leg_state()
+        eef_cmds_[leg].z() = _eef.z();
       }
     }
 
@@ -229,9 +269,9 @@ void Creep::post_tick() {
   print_eef_pos();
 
   Eigen::Vector3d margins = stability_margin(swing_leg_);
-  // LOG_WARNING << "cog -> cf-ch:" << margins.x();
-  // LOG_WARNING << "cog -> il-sl:" << margins.y();
-  // LOG_WARNING << "cog -> il-dl:" << margins.z();
+  LOG_WARNING << "cog -> cf-ch:" << margins.x();
+  LOG_WARNING << "cog -> il-sl:" << margins.y();
+  LOG_WARNING << "cog -> il-dl:" << margins.z();
 }
 
 void Creep::pose_init() {
@@ -249,28 +289,23 @@ void Creep::pose_init() {
 
 void Creep::ready() {
   if (!timer_->running()) {
-    ///! programming the next fpt.
-    Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-    _next_eef.x() = cp_params_->FOOT_STEP;
-
-    ///! propgraming the CoG trajectory.
-    _next_eef    = _next_eef + body_iface_->leg_base(swing_leg_);
-    Eigen::Vector3d _cf_eef = leg_ifaces_[LEGTYPE_CF(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_CF(swing_leg_));
-
-    Eigen::Vector2d _last_cog = body_iface_->cog().head(2);
-    Eigen::Vector2d _next_cog(_last_cog.x() + 0.5*cp_params_->FOOT_STEP, _last_cog.y());
-    Eigen::Vector2d _cs = geometry::cross_point(
-        geometry::linear(_cf_eef.head(2), _next_eef.head(2)),
-        geometry::linear(_next_cog, _last_cog));
-
-    _next_cog     = (_cs + _last_cog) * 0.5;
-    _next_cog.y() = (LEGTYPE_IS_HIND(swing_leg_) ? _cf_eef.y() * 0.3 : 0);
-    LOG_WARNING << "NEXT COG: " << _next_cog.transpose();
-
-    prog_cog_traj(_next_cog);
     ///! start the timer
     timer_->start();
   }
+
+  FOR_EACH_LEG(l) {
+    if (LegState::TD_STATE != leg_ifaces_[l]->leg_state())
+      eef_cmds_[l].z() = boost::algorithm::clamp(eef_cmds_[l].z() - 0.3,
+          -cp_params_->STANCE_HEIGHT - 10, -cp_params_->STANCE_HEIGHT + 5);
+  }
+}
+
+bool Creep::end_ready() {
+  FOR_EACH_LEG(l) {
+    if (LegState::TD_STATE != leg_ifaces_[l]->leg_state())
+      return false;
+  }
+  return true;
 }
 
 void Creep::swing_hind() {
@@ -278,6 +313,8 @@ void Creep::swing_hind() {
     ///! programming the next fpt.
     Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
     _next_eef.x() = cp_params_->FOOT_STEP;
+    _next_eef.y() = (LEGTYPE_IS_LEFT(swing_leg_)) ?
+                       cp_params_->FOOT_STEP_Y : -cp_params_->FOOT_STEP_Y;
 
     ///! propgraming the CoG trajectory.
     _next_eef    = _next_eef + body_iface_->leg_base(swing_leg_);
@@ -307,7 +344,9 @@ void Creep::swing_hind() {
       ///! programming the swing trajectory.
       LOG_WARNING << "STARTING...";
       Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-      _next_eef << cp_params_->FOOT_STEP, 0, -cp_params_->STANCE_HEIGHT - 5;
+      _next_eef.x() = cp_params_->FOOT_STEP;
+      _next_eef.y() = (LEGTYPE_IS_LEFT(swing_leg_)) ?
+                         cp_params_->FOOT_STEP_Y : -cp_params_->FOOT_STEP_Y;
       prog_eef_traj(_next_eef);
 
       swing_timer_->start();
@@ -316,11 +355,19 @@ void Creep::swing_hind() {
 
   ///! If the swing_timer is running, control the swing leg.
   if (swing_timer_->running()) {
-    double _dt = swing_timer_->span()/1000.0;
-    if ((_dt >= 0.8*eef_traj_->ceiling()) && (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()))
-      eef_cmds_[swing_leg_] = leg_ifaces_[swing_leg_]->eef();
-    else
+    if (swing_timer_->span() >= 0.8*cp_params_->SWING_TIME) {
+      if (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) {
+        (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state());
+      } else if (swing_timer_->span() > cp_params_->SWING_TIME) {
+        eef_cmds_[swing_leg_].z() = boost::algorithm::clamp(
+            leg_ifaces_[swing_leg_]->eef().z() - 0.3,
+            -cp_params_->STANCE_HEIGHT - 10, -cp_params_->STANCE_HEIGHT + 5);
+      } else {
+        eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
+      }
+    } else {
       eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
+    }
   }
 
   ///! If the cog_timer is running, control to move the CoG.
@@ -340,7 +387,9 @@ void Creep::swing_front() {
     Eigen::Vector3d _il_eef = leg_ifaces_[LEGTYPE_IL(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_IL(swing_leg_));
     ///! programming the next fpt.
     Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
-    _next_eef << cp_params_->FOOT_STEP, 0, -cp_params_->STANCE_HEIGHT - 5;
+    _next_eef.x() = cp_params_->FOOT_STEP;
+    _next_eef.y() = (LEGTYPE_IS_LEFT(swing_leg_)) ?
+                       cp_params_->FOOT_STEP_Y : -cp_params_->FOOT_STEP_Y;
     prog_eef_traj(_next_eef);
 
     ///! propgraming the CoG trajectory.
@@ -363,10 +412,10 @@ void Creep::swing_front() {
 
   if (cog_timer_->running()) {
     Eigen::Vector3d margins = stability_margin(swing_leg_);
-    LOG_WARNING << "cog -> cf-ch:" << margins.x();
-    LOG_WARNING << "cog -> il-sl:" << margins.y();
-    LOG_WARNING << "cog -> il-dl:" << margins.z();
-    LOG_WARNING << "threshold:   " << cp_params_->MARGIN_THRES;
+//    LOG_WARNING << "cog -> cf-ch:" << margins.x();
+//    LOG_WARNING << "cog -> il-sl:" << margins.y();
+//    LOG_WARNING << "cog -> il-dl:" << margins.z();
+//    LOG_WARNING << "threshold:   " << cp_params_->MARGIN_THRES;
     if ((margins.minCoeff() <= cp_params_->MARGIN_THRES)
          || !swing_timer_->running()) {
       LOG_WARNING << "STOP...";
@@ -376,10 +425,19 @@ void Creep::swing_front() {
 
   ///! If the swing_timer is running, control the swing leg.
   if (swing_timer_->running()) {
-    if ((swing_timer_->span() >= 0.8*cp_params_->SWING_TIME) && (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()))
-      eef_cmds_[swing_leg_] = leg_ifaces_[swing_leg_]->eef();
-    else
+    if (swing_timer_->span() >= 0.8*cp_params_->SWING_TIME) {
+      if (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) {
+        (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state());
+      } else if (swing_timer_->span() > cp_params_->SWING_TIME) {
+        eef_cmds_[swing_leg_].z() = boost::algorithm::clamp(
+            leg_ifaces_[swing_leg_]->eef().z() - 0.3,
+            -cp_params_->STANCE_HEIGHT - 10, -cp_params_->STANCE_HEIGHT + 5);
+      } else {
+        eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
+      }
+    } else {
       eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
+    }
   }
 
   ///! If the cog_timer is running, control to move the CoG.

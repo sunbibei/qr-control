@@ -58,6 +58,14 @@ private:
   ///! The callback for CP_SWING_HIND
   void swing_hind();
   /*!
+   * @brief The criterion for CP_INIT_POS
+   */
+  bool end_pose_init();
+  /*!
+   * @brief The criterion for CP_READY
+   */
+  bool end_ready();
+  /*!
    * @brief The criterion for CP_SWING_XXX
    */
   bool end_walk();
@@ -97,7 +105,7 @@ private:
   ///! The end-effector command.
   Eigen::Vector3d       eef_cmds_[LegType::N_LEGS];
   ///! The next foothold.
-  Eigen::Vector3d       next_fpt_;
+  Eigen::Vector4d       balance_fpts_;
 
   ///! The time control. this TimeControl will be started in the begin of
   ///! each state, stopped in the end of each state.
