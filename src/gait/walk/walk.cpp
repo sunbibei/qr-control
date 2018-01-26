@@ -345,7 +345,7 @@ void Walk::checkState() {
 //    swing_timer_->stop();
 //    cog_timer_->stop();
 
-    PRESS_THEN_GO
+    // PRESS_THEN_GO
     ///! updating the following swing leg
     swing_leg_     = next_leg(swing_leg_);
     break;
@@ -369,8 +369,8 @@ void Walk::checkState() {
     timer_->stop(&_s_tmp_span);
     LOG_WARNING << "*******----INIT POSE OK!("
         << _s_tmp_span << "ms)----*******";
-    print_jnt_pos(/*JNTS_TARGET*/);
-    print_eef_pos();
+    // print_jnt_pos(/*JNTS_TARGET*/);
+    // print_eef_pos();
 
     PRESS_THEN_GO
     ///! updating the following swing leg
@@ -538,16 +538,16 @@ void Walk::post_tick() {
     leg_ifaces_[leg]->move();
   }
 
-  Eigen::Vector3d margins = stability_margin(swing_leg_);
-  LOG_WARNING << "cog -> cf-ch:" << margins.x();
-  LOG_WARNING << "cog -> il-sl:" << margins.y();
-  LOG_WARNING << "cog -> il-dl:" << margins.z();
+  // Eigen::Vector3d margins = stability_margin(swing_leg_);
+  // LOG_WARNING << "cog -> cf-ch:" << margins.x();
+  // LOG_WARNING << "cog -> il-sl:" << margins.y();
+  // LOG_WARNING << "cog -> il-dl:" << margins.z();
 
 //  if (current_state_ == WalkState::WK_SWING) {
 //    __print_positions(leg_ifaces_[swing_leg_]->eef(), eef_traj_->sample(1));
 //  } else
-  print_jnt_pos(/*JNTS_TARGET*/);
-  print_eef_pos();
+  // print_jnt_pos(JNTS_TARGET);
+  // print_eef_pos();
 
 #ifdef RECORDER_EEF_TRAJ
     Discrete<double, 14>::StateVec vec;
@@ -566,7 +566,8 @@ void Walk::post_tick() {
   if(cmd_pub_->trylock()) {
     cmd_pub_->msg_.data.clear();
     for (const auto& l : {LegType::FL, LegType::FR, LegType::HL, LegType::HR}) {
-      const auto& cmds = leg_cmds_[l]->target;
+      auto& cmds = leg_cmds_[l]->target;
+      leg_ifaces_[l]->ik(leg_cmd_eefs_[l], cmds);
       for (const auto& j : {JntType::KNEE, JntType::HIP, JntType::YAW}) {
         cmd_pub_->msg_.data.push_back(cmds(j));
       }
@@ -578,8 +579,8 @@ void Walk::post_tick() {
 
 void Walk::pose_init() {
   // Nothing to do here.
-  print_eef_pos(leg_cmd_eefs_[LegType::FL], leg_cmd_eefs_[LegType::FR],
-    leg_cmd_eefs_[LegType::HL], leg_cmd_eefs_[LegType::HR]);
+  // print_eef_pos(leg_cmd_eefs_[LegType::FL], leg_cmd_eefs_[LegType::FR],
+  //   leg_cmd_eefs_[LegType::HL], leg_cmd_eefs_[LegType::HR]);
 }
 
 bool Walk::end_pose_init() {

@@ -21,7 +21,7 @@
 #include "adt/discrete.h"
 #endif
 
-// #define PUB_ROS_TOPIC
+#define PUB_ROS_TOPIC
 #ifdef PUB_ROS_TOPIC
 #include <ros/ros.h>
 #include <boost/scoped_ptr.hpp>
