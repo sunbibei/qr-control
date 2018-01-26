@@ -342,8 +342,8 @@ void Walk::checkState() {
     timer_->stop(&_s_tmp_span);
     LOG_WARNING << "*******----WALK ONE-STEP OK!("
         << _s_tmp_span << "ms)----*******";
-    swing_timer_->stop();
-    cog_timer_->stop();
+//    swing_timer_->stop();
+//    cog_timer_->stop();
 
     PRESS_THEN_GO
     ///! updating the following swing leg
@@ -749,10 +749,24 @@ void Walk::walk() {
 }
 
 bool Walk::end_walk() {
-//  if (_s_is_hang) {
-    return ((cog_timer_->span() >= /*2**/wk_params_->COG_TIME)
-              && swing_timer_->span() >= 2000/*eef_traj_->ceiling()*/);
-//  }
+  if (_s_is_hang) {
+    if (swing_timer_->span() >= 2000)
+      swing_timer_->stop();
+    if (cog_timer_->span() >= wk_params_->COG_TIME)
+      cog_timer_->stop();
+
+  } else {
+    ///! the real walk.
+    if ((swing_timer_->span() >= 0.6*2000)
+          && (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state())) {
+      swing_timer_->stop();
+    }
+
+    if (cog_timer_->span() >= /*2**/wk_params_->COG_TIME)
+      cog_timer_->stop();
+  }
+
+  return (!swing_timer_->running() && !cog_timer_->running());
 }
 
 // TODO
