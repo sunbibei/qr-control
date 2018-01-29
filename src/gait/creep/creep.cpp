@@ -39,12 +39,14 @@ struct CreepParams {
   double   SWING_DROP;
   ///! The minimum stability margin could to swing leg.
   double   MARGIN_THRES;
+  ///! The maximum swing difference(cm)
+  double   ALLOW_DIFF;
 
   CreepParams(const MiiString& _tag)
     : FOOT_STEP(10),     FOOT_STEP_Y(0),
       STANCE_HEIGHT(46), SWING_HEIGHT(5),
       COG_TIME(2000),    SWING_TIME(2000),
-      MARGIN_THRES(6) {
+      MARGIN_THRES(6),   ALLOW_DIFF(5) {
     auto cfg = MiiCfgReader::instance();
     cfg->get_value(_tag, "step",         FOOT_STEP);
     cfg->get_value(_tag, "step_y",       FOOT_STEP_Y);
@@ -209,10 +211,16 @@ void Creep::checkState() {
         << " (" << _s_tmp_span << "ms)----*******";
 
     PRESS_THEN_GO
-    ///! updating the following swing leg
-    swing_leg_     = next_leg(swing_leg_);
-    current_state_ = (LEGTYPE_IS_FRONT(swing_leg_) ?
-            CreepState::CP_SWING_FRONT : CreepState::CP_SWING_HIND);
+    Eigen::Vector3d _eef = leg_ifaces_[swing_leg_]->eef();
+    auto diff = _eef.x() - eef_traj_->sample(eef_traj_->ceiling()).x();
+    if (diff < cp_params_->ALLOW_DIFF) {
+      ///! the swing leg has been advanced.
+      ///! updating the following swing leg
+      swing_leg_     = next_leg(swing_leg_);
+      current_state_ = (LEGTYPE_IS_FRONT(swing_leg_) ?
+              CreepState::CP_SWING_FRONT : CreepState::CP_SWING_HIND);
+    }
+
     break;
   }
   default:
@@ -356,7 +364,7 @@ void Creep::swing_hind() {
     }
   }
 
-  ///! If the swing_timer is running, control the swing leg.
+  ///! If the swing_timer is running, control to swing leg.
   if (swing_timer_->running()) {
     if (swing_timer_->span() >= 0.8*cp_params_->SWING_TIME) {
       if (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) {
@@ -386,8 +394,6 @@ void Creep::swing_hind() {
 
 void Creep::swing_front() {
   if (!timer_->running()) {
-    Eigen::Vector3d _cf_eef = leg_ifaces_[LEGTYPE_CF(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_CF(swing_leg_));
-    Eigen::Vector3d _il_eef = leg_ifaces_[LEGTYPE_IL(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_IL(swing_leg_));
     ///! programming the next fpt.
     Eigen::Vector3d _next_eef = leg_ifaces_[swing_leg_]->eef();
     _next_eef.x() = cp_params_->FOOT_STEP;
@@ -396,22 +402,33 @@ void Creep::swing_front() {
     prog_eef_traj(_next_eef);
 
     ///! propgraming the CoG trajectory.
-    Eigen::Vector2d _last_cog = body_iface_->cog().head(2);
-    Eigen::Vector2d _next_cog(_last_cog.x() + 0.5*cp_params_->FOOT_STEP, 0.0);
-    _next_cog.y() = (_il_eef.y() + _cf_eef.y()) * 0.5;
+    Eigen::Vector3d margins = stability_margin(swing_leg_);
+    if (margins.minCoeff() < cp_params_->MARGIN_THRES) {
+      Eigen::Vector3d _cf_eef = leg_ifaces_[LEGTYPE_CF(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_CF(swing_leg_));
+      Eigen::Vector3d _il_eef = leg_ifaces_[LEGTYPE_IL(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_IL(swing_leg_));
+      Eigen::Vector3d _ch_eef = leg_ifaces_[LEGTYPE_CH(swing_leg_)]->eef() + body_iface_->leg_base(LEGTYPE_CH(swing_leg_));
+      Eigen::Vector2d _next_cog = geometry::incenter_of_triangle(
+          _cf_eef.head(2), _il_eef.head(2), _ch_eef.head(2));
 
-    Eigen::Vector2d _cs = geometry::cross_point(
-        geometry::linear(_cf_eef.head(2), _il_eef.head(2)),
-        geometry::linear(_next_cog, _last_cog));
-
-    _next_cog     = _cs;
-    // _next_cog.y() = _cf_eef.y() * 0.3;
-    LOG_WARNING << "NEXT COG: " << _next_cog.transpose();
-
-    prog_cog_traj(_next_cog);
+      LOG_WARNING << "NEXT COG: " << _next_cog.transpose();
+      prog_cog_traj(_next_cog);
+    }
+//    Eigen::Vector2d _last_cog = body_iface_->cog().head(2);
+//    Eigen::Vector2d _next_cog(_last_cog.x() + 0.5*cp_params_->FOOT_STEP, 0.0);
+//    _next_cog.y() = (_il_eef.y() + _cf_eef.y()) * 0.5;
+//
+//    Eigen::Vector2d _cs = geometry::cross_point(
+//        geometry::linear(_cf_eef.head(2), _il_eef.head(2)),
+//        geometry::linear(_next_cog, _last_cog));
+//
+//    _next_cog     = _cs;
+//    // _next_cog.y() = _cf_eef.y() * 0.3;
+//    LOG_WARNING << "NEXT COG: " << _next_cog.transpose();
+//
+//    prog_cog_traj(_next_cog);
     ///! start the timer
     timer_->start();
-    //cog_timer_->start();
+    cog_timer_->start();
     swing_timer_->start();
   }
 
@@ -421,7 +438,7 @@ void Creep::swing_front() {
 //    LOG_WARNING << "cog -> il-sl:" << margins.y();
 //    LOG_WARNING << "cog -> il-dl:" << margins.z();
 //    LOG_WARNING << "threshold:   " << cp_params_->MARGIN_THRES;
-    if ((margins.minCoeff() <= cp_params_->MARGIN_THRES)
+    if ((margins.minCoeff() > cp_params_->MARGIN_THRES)
          || !swing_timer_->running()) {
       LOG_WARNING << "STOP...";
       cog_timer_->stop();
