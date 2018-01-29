@@ -363,7 +363,7 @@ void Creep::swing_hind() {
         (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state());
       } else if (swing_timer_->span() > cp_params_->SWING_TIME) {
         eef_cmds_[swing_leg_].z() = boost::algorithm::clamp(
-            leg_ifaces_[swing_leg_]->eef().z() - 0.3,
+            leg_ifaces_[swing_leg_]->eef().z() - 1,
             -cp_params_->STANCE_HEIGHT - 10, -cp_params_->STANCE_HEIGHT + 5);
       } else {
         eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
@@ -411,7 +411,7 @@ void Creep::swing_front() {
     prog_cog_traj(_next_cog);
     ///! start the timer
     timer_->start();
-    cog_timer_->start();
+    //cog_timer_->start();
     swing_timer_->start();
   }
 
@@ -435,7 +435,7 @@ void Creep::swing_front() {
         (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state());
       } else if (swing_timer_->span() > cp_params_->SWING_TIME) {
         eef_cmds_[swing_leg_].z() = boost::algorithm::clamp(
-            leg_ifaces_[swing_leg_]->eef().z() - 0.3,
+            leg_ifaces_[swing_leg_]->eef().z() - 1,
             -cp_params_->STANCE_HEIGHT - 10, -cp_params_->STANCE_HEIGHT + 5);
       } else {
         eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
