@@ -61,6 +61,7 @@ struct CreepParams {
     cfg->get_value(_tag, "swing_drop",     SWING_DROP);
 
     cfg->get_value(_tag, "margin_threshold", MARGIN_THRES);
+    cfg->get_value(_tag, "allow_diff",       ALLOW_DIFF);
   }
 };
 
@@ -211,10 +212,9 @@ void Creep::checkState() {
         << " (" << _s_tmp_span << "ms)----*******";
 
     PRESS_THEN_GO
-    Eigen::Vector3d _eef = leg_ifaces_[swing_leg_]->eef();
-    auto diff = _eef.x() - eef_traj_->sample(eef_traj_->ceiling()).x();
-    if (diff < cp_params_->ALLOW_DIFF) {
-      ///! the swing leg has been advanced.
+
+    auto diff = leg_ifaces_[swing_leg_]->eef().x() - eef_traj_->sample(eef_traj_->ceiling()).x();
+    if (std::abs(diff) < cp_params_->ALLOW_DIFF) {
       ///! updating the following swing leg
       swing_leg_     = next_leg(swing_leg_);
       current_state_ = (LEGTYPE_IS_FRONT(swing_leg_) ?
@@ -246,7 +246,9 @@ void Creep::post_tick() {
     if (!is_hang_ && CreepState::CP_INIT_POSE != current_state_
         && CreepState::CP_READY != current_state_) {
       Eigen::Vector3d _eef = leg_ifaces_[leg]->eef();
+
       if (LegState::TD_STATE != leg_ifaces_[leg]->leg_state()) {
+        ///! If has not touch the earth, drop deeper.
         if ((swing_leg_ != leg) || (!swing_timer_->running())) {
           ///! When the moving CoG and not to swing leg yet.
           eef_cmds_[leg].z() = boost::algorithm::clamp(
@@ -256,6 +258,7 @@ void Creep::post_tick() {
           ;// Nothing to do here.
         }
       } else {
+        ///! If has touch the earth, adjust the height close to the balance height.
         if ((swing_leg_ != leg) || (!swing_timer_->running())) {
           double diff = balance_fpts_(leg) - _eef.z();
           if (std::abs(diff) > 0.5) {
@@ -366,18 +369,23 @@ void Creep::swing_hind() {
 
   ///! If the swing_timer is running, control to swing leg.
   if (swing_timer_->running()) {
+    ///! The default next eef coordination.
+    eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
+
+    ///! If close to the floor, we need to judge whether has touch the earth.
     if (swing_timer_->span() >= 0.8*cp_params_->SWING_TIME) {
+      Eigen::Vector3d _eef = leg_ifaces_[swing_leg_]->eef();
+      ///! If touch the earth, don't move and will stop swing leg in the @end_walk.
       if (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) {
-        (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state());
-      } else if (swing_timer_->span() > cp_params_->SWING_TIME) {
-        eef_cmds_[swing_leg_].z() = boost::algorithm::clamp(
-            leg_ifaces_[swing_leg_]->eef().z() - 1,
-            -cp_params_->STANCE_HEIGHT - 10, -cp_params_->STANCE_HEIGHT + 5);
+        eef_cmds_[swing_leg_] = _eef;
       } else {
-        eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
+        ///! If don't touch the earth, we will to touch more deep.
+        if (swing_timer_->span() > cp_params_->SWING_TIME) {
+          eef_cmds_[swing_leg_].z() = boost::algorithm::clamp(
+              leg_ifaces_[swing_leg_]->eef().z() - 1,
+              balance_fpts_(swing_leg_) - 10, balance_fpts_(swing_leg_));
+        }
       }
-    } else {
-      eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
     }
   }
 
@@ -445,20 +453,25 @@ void Creep::swing_front() {
     }
   }
 
-  ///! If the swing_timer is running, control the swing leg.
+  ///! If the swing_timer is running, control to swing leg.
   if (swing_timer_->running()) {
+    ///! The default next eef coordination.
+    eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
+
+    ///! If close to the floor, we need to judge whether has touch the earth.
     if (swing_timer_->span() >= 0.8*cp_params_->SWING_TIME) {
+      Eigen::Vector3d _eef = leg_ifaces_[swing_leg_]->eef();
+      ///! If touch the earth, don't move and will stop swing leg in the @end_walk.
       if (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state()) {
-        (LegState::TD_STATE == leg_ifaces_[swing_leg_]->leg_state());
-      } else if (swing_timer_->span() > cp_params_->SWING_TIME) {
-        eef_cmds_[swing_leg_].z() = boost::algorithm::clamp(
-            leg_ifaces_[swing_leg_]->eef().z() - 1,
-            -cp_params_->STANCE_HEIGHT - 10, -cp_params_->STANCE_HEIGHT + 5);
+        eef_cmds_[swing_leg_] = _eef;
       } else {
-        eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
+        ///! If don't touch the earth, we will to touch more deep.
+        if (swing_timer_->span() > cp_params_->SWING_TIME) {
+          eef_cmds_[swing_leg_].z() = boost::algorithm::clamp(
+              leg_ifaces_[swing_leg_]->eef().z() - 1,
+              balance_fpts_(swing_leg_) - 10, balance_fpts_(swing_leg_));
+        }
       }
-    } else {
-      eef_cmds_[swing_leg_] = eef_traj_->sample(swing_timer_->span()/1000.0);
     }
   }
 
