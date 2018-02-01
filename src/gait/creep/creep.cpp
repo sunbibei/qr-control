@@ -420,6 +420,8 @@ void Creep::swing_front() {
 
       LOG_WARNING << "NEXT COG: " << _next_cog.transpose();
       prog_cog_traj(_next_cog);
+    } else {
+      ;
     }
 //    Eigen::Vector2d _last_cog = body_iface_->cog().head(2);
 //    Eigen::Vector2d _next_cog(_last_cog.x() + 0.5*cp_params_->FOOT_STEP, 0.0);
@@ -446,7 +448,7 @@ void Creep::swing_front() {
 //    LOG_WARNING << "cog -> il-sl:" << margins.y();
 //    LOG_WARNING << "cog -> il-dl:" << margins.z();
 //    LOG_WARNING << "threshold:   " << cp_params_->MARGIN_THRES;
-    if ((margins.minCoeff() > cp_params_->MARGIN_THRES)
+    if ((margins.minCoeff() < cp_params_->MARGIN_THRES)
          || !swing_timer_->running()) {
       LOG_WARNING << "STOP...";
       cog_timer_->stop();
