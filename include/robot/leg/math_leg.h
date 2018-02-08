@@ -43,7 +43,32 @@ public:
   virtual void ik(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) = 0;
   virtual void ik(const Eigen::Vector3d&,   EVX& angle)  = 0;
   virtual void ik(const Eigen::Quaterniond&, EVX& angle) = 0;
-
+  /*！
+   * @brief The forward dynamics solution for the foot link.
+   * @param force [out] The current force output from the foot link.
+   */
+  // virtual void fd(Eigen::Vector3d&) = 0;
+  /*!
+   * @brief The inverse dynamics sulution, given the target force from foot.
+   * @param forces [in]  The target of the force from foot.
+   * @param torque [out] The result of joint torque.
+   */
+  // virtual void id(const Eigen::Vector3d&, Eigen::VectorXd&) = 0;
+  /*！
+   * @brief The forward statics solution for the foot link.
+   * @param force [out] The current force output from the foot link.
+   */
+  virtual void fs(Eigen::Vector3d&) = 0;
+  /*!
+   * @brief The inverse statics sulution, given the target force from foot.
+   * @param forces [in]  The target of the force from foot.
+   * @param torque [out] The result of joint torque.
+   */
+  virtual void is(const Eigen::Vector3d&, Eigen::VectorXd&) = 0;
+  /*!
+   * @brief The current Jacobian matrix with given joint position.
+   */
+  virtual void Jacobian(Eigen::Matrix3Xd&) = 0;
   ///! need to delete
   // virtual void inverseKinematics(const EVX& jnt_pos, EVX& angle) = 0;
 

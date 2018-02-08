@@ -54,7 +54,21 @@ public:
   virtual void ik(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) override;
   virtual void ik(const Eigen::Vector3d&,   EVX& angle)  override;
   virtual void ik(const Eigen::Quaterniond&, EVX& angle) override;
-
+  /*！
+   * @brief The forward statics solution for the foot link.
+   * @param force [out] The current force output from the foot link.
+   */
+  virtual void fs(Eigen::Vector3d&) override;
+  /*!
+   * @brief The inverse statics sulution, given the target force from foot.
+   * @param forces [in]  The target of the force from foot.
+   * @param torque [out] The result of joint torque.
+   */
+  virtual void is(const Eigen::Vector3d&, Eigen::VectorXd&) override;
+  /*!
+   * @brief The current Jacobian matrix with given joint position.
+   */
+  virtual void Jacobian(Eigen::Matrix3Xd&) override;
 ///! Offer some convenient interfaces for user.
 public:
   ///! The position of LegType::YAW joint.

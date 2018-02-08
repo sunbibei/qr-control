@@ -268,6 +268,18 @@ void QrLeg::ik(const Eigen::Quaterniond&, EVX& angle) {
   LOG_ERROR << "Call the 'inverseKinematics' which has does not complemented.";
 }
 
+void QrLeg::fs(Eigen::Vector3d&) {
+  LOG_ERROR << "Call the 'forwardStatics' which has does not complemented.";
+}
+
+void QrLeg::is(const Eigen::Vector3d&, Eigen::VectorXd& angle) {
+  LOG_ERROR << "Call the 'inverseStatics' which has does not complemented.";
+}
+
+void QrLeg::Jacobian(Eigen::Matrix3Xd& _jacob) {
+  // TODO
+}
+
 } /* namespace qr_control */
 
 #include <class_loader/class_loader_register_macro.h>
