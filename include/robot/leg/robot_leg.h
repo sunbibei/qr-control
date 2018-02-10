@@ -37,13 +37,14 @@ public:
 
 ///! The status of robot-leg of getter
 public:
-  void eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy);
+  // void eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy);
   void eef(Eigen::Vector3d&);
-  void eef(Eigen::Quaterniond&);
+  // void eef(Eigen::Quaterniond&);
   Eigen::Vector3d eef();
  
 public:
   /*!
+   * TODO waiting to implement
    * @brief This method will be return immediately, the process of control is
    *        running in a detach thread.
    * @param remainder The remainder time in ms.
@@ -81,7 +82,7 @@ public:
   /*!
    * @brief Set a end-effector pose target.
    */
-  void eefOrientationTarget  (const Eigen::Quaterniond&);
+  // void eefOrientationTarget  (const Eigen::Quaterniond&);
   /*!
    * @brief Set a end-effector position target.
    */
@@ -90,7 +91,7 @@ public:
    * @brief Set a end-effector target.
    */
   void eefTarget             (const EefTarget&);
-  void eefTarget             (const Eigen::Vector3d&, const Eigen::Quaterniond&);
+  // void eefTarget             (const Eigen::Vector3d&, const Eigen::Quaterniond&);
   /*!
    * @brief Set a end-effector trajectory target.
    */
@@ -124,7 +125,7 @@ protected:
   virtual void executJnt(const JntTarget&);
   virtual void executEef(const EefTarget&);
   virtual void executEef(const Eigen::Vector3d&);
-  virtual void executEef(const Eigen::Quaterniond&);
+  // virtual void executEef(const Eigen::Quaterniond&);
 
 
 ///! The targets for each spaces.

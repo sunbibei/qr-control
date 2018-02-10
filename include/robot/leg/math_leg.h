@@ -26,12 +26,12 @@ public:
   ///! The current state, enumerate the state in the LegState
   virtual LegState leg_state() = 0;
   /*!
-   * @brief The forward kinematic solution for the foot link.
+   * @brief The forward kinematic solution for the position of foot link.
    * @param translation [out]  The current translation from the base frame.
    * @param quaternion  [out]  The current quaternion related to the base frame.
    */
-  virtual void fk(Eigen::Vector3d&, Eigen::Quaterniond&) = 0;
-  virtual void fk(Eigen::Quaterniond&) = 0;
+  // virtual void fk(Eigen::Vector3d&, Eigen::Quaterniond&) = 0;
+  // virtual void fk(Eigen::Quaterniond&) = 0;
   virtual void fk(Eigen::Vector3d&)    = 0;
   /*!
    * @brief The inverse kinematic solution, given the target of foot pose.
@@ -40,9 +40,9 @@ public:
    * @param jnt_pos     [out] The result of joint position.
    * @return Return true, if everything is OK, or return false.
    */
-  virtual void ik(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) = 0;
+  // virtual void ik(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) = 0;
   virtual void ik(const Eigen::Vector3d&,   EVX& angle)  = 0;
-  virtual void ik(const Eigen::Quaterniond&, EVX& angle) = 0;
+  // virtual void ik(const Eigen::Quaterniond&, EVX& angle) = 0;
   /*！
    * @brief The forward dynamics solution for the foot link.
    * @param force [out] The current force output from the foot link.

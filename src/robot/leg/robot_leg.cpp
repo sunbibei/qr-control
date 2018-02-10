@@ -51,9 +51,9 @@ void RobotLeg::move() {
   case TargetType::EEF_XYZ:
     executEef(eef_target_.xyz);
     break;
-  case TargetType::EEF_RPY:
-    executEef(eef_target_.rpy);
-    break;
+//  case TargetType::EEF_RPY:
+//    executEef(eef_target_.rpy);
+//    break;
   case TargetType::EEF_POSE:
     executEef(eef_target_);
     break;
@@ -89,10 +89,10 @@ void RobotLeg::executEef(const EefTarget& p) {
   EVX _jnt_pos;
   if (TargetType::EEF_XYZ == curr_target_) {
     ik(p.xyz, _jnt_pos);
-  } else if (TargetType::EEF_RPY  == curr_target_) {
-    ik(p.rpy, _jnt_pos);;
-  } else if (TargetType::EEF_POSE == curr_target_) {
-    ik(p.xyz, p.rpy, _jnt_pos);;
+//  } else if (TargetType::EEF_RPY  == curr_target_) {
+//    ik(p.rpy, _jnt_pos);;
+//  } else if (TargetType::EEF_POSE == curr_target_) {
+//    ik(p.xyz, p.rpy, _jnt_pos);;
   } else {
     LOG_ERROR << "What fucking code!";
   }
@@ -107,12 +107,12 @@ void RobotLeg::executEef(const Eigen::Vector3d& xyz) {
   joint_command(_jnt_pos);
 }
 
-void RobotLeg::executEef(const Eigen::Quaterniond& rpy) {
-  EVX _jnt_pos;
-  ik(rpy, _jnt_pos);
-
-  joint_command(_jnt_pos);
-}
+//void RobotLeg::executEef(const Eigen::Quaterniond& rpy) {
+//  EVX _jnt_pos;
+//  ik(rpy, _jnt_pos);
+//
+//  joint_command(_jnt_pos);
+//}
 
 ///! setter methods
 void RobotLeg::legTarget(const LegTarget& t) {
@@ -150,10 +150,10 @@ void RobotLeg::jointTrajectoryTarget(const Traj3dSp& _traj) {
   curr_target_               = TargetType::JNT_TRAJ;
 }
 
-void RobotLeg::eefOrientationTarget(const Eigen::Quaterniond& t) {
-  eef_target_.rpy = t;
-  curr_target_    = TargetType::EEF_RPY;
-}
+//void RobotLeg::eefOrientationTarget(const Eigen::Quaterniond& t) {
+//  eef_target_.rpy = t;
+//  curr_target_    = TargetType::EEF_RPY;
+//}
 
 void RobotLeg::eefPositionTarget(const Eigen::Vector3d& t) {
   eef_target_.xyz = t;
@@ -191,17 +191,17 @@ void RobotLeg::eefTrajectoryTarget(const Traj3dSp& t) {
 //  return *eef_traj_target_;
 //}
 
-void RobotLeg:: eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy) {
-  fk(_xyz, _rpy);
-}
+//void RobotLeg:: eef(Eigen::Vector3d& _xyz, Eigen::Quaterniond& _rpy) {
+//  fk(_xyz, _rpy);
+//}
 
 void RobotLeg::eef(Eigen::Vector3d& _xyz) {
   fk(_xyz);
 }
 
-void RobotLeg::eef(Eigen::Quaterniond& _rpy) {
-  fk(_rpy);
-}
+//void RobotLeg::eef(Eigen::Quaterniond& _rpy) {
+//  fk(_rpy);
+//}
 
 Eigen::Vector3d RobotLeg::eef() {
   Eigen::Vector3d _xyz;

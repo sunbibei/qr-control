@@ -210,9 +210,9 @@ Formula:
    Py = L0 * S0 + L1 * S0 * C1 + L2 * S0 * C12;
    Pz = - Lo * C0 - L1 * C0 * C1 - L2 * C0 * C12;
 */
-void QrLeg::fk(Eigen::Vector3d& xyz, Eigen::Quaterniond&) {
-  LOG_ERROR << "Call the 'forwardKinematics' which has does not complemented.";
-}
+//void QrLeg::fk(Eigen::Vector3d& xyz, Eigen::Quaterniond&) {
+//  LOG_ERROR << "Call the 'forwardKinematics' which has does not complemented.";
+//}
 
 void QrLeg::fk(Eigen::Vector3d& xyz) {
   // TODO WSR is as follow
@@ -228,9 +228,9 @@ void QrLeg::fk(Eigen::Vector3d& xyz) {
       - topology_->L2() * cos(yaw()) * cos(hip() + knee());
 }
 
-void QrLeg::fk(Eigen::Quaterniond&) {
-  LOG_ERROR << "Call the 'forwardKinematics' which has does not complemented.";
-}
+//void QrLeg::fk(Eigen::Quaterniond&) {
+//  LOG_ERROR << "Call the 'forwardKinematics' which has does not complemented.";
+//}
 /*
 Description: calculating reverse kinematics for quadruped robot(3 DOF)
 Formula:
@@ -260,13 +260,13 @@ void QrLeg::ik(const Eigen::Vector3d& xyz, Eigen::VectorXd& jnts) {
       - Phi * (topology_->L2() * sin(jnts(JntType::KNEE)) - Delte))) / Phi);
 }
 
-void QrLeg::ik(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) {
-  LOG_ERROR << "Call the 'inverseKinematics' which has does not complemented.";
-}
-
-void QrLeg::ik(const Eigen::Quaterniond&, EVX& angle) {
-  LOG_ERROR << "Call the 'inverseKinematics' which has does not complemented.";
-}
+//void QrLeg::ik(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) {
+//  LOG_ERROR << "Call the 'inverseKinematics' which has does not complemented.";
+//}
+//
+//void QrLeg::ik(const Eigen::Quaterniond&, EVX& angle) {
+//  LOG_ERROR << "Call the 'inverseKinematics' which has does not complemented.";
+//}
 
 void QrLeg::fs(Eigen::Vector3d&) {
   LOG_ERROR << "Call the 'forwardStatics' which has does not complemented.";

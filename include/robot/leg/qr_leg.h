@@ -36,12 +36,12 @@ public:
 
 public:
   /*!
-   * @brief The forward kinematic solution for the foot link.
+   * @brief The forward kinematic solution for the position of foot link.
    * @param translation [out]  The current translation from the base frame.
    * @param quaternion  [out]  The current quaternion related to the base frame.
    */
-  virtual void fk(Eigen::Vector3d&, Eigen::Quaterniond&) override;
-  virtual void fk(Eigen::Quaterniond&) override;
+  // virtual void fk(Eigen::Vector3d&, Eigen::Quaterniond&) override;
+  // virtual void fk(Eigen::Quaterniond&) override;
   virtual void fk(Eigen::Vector3d&)    override;
   /*!
    * @brief The inverse kinematic solution, given the target of foot pose.
@@ -51,9 +51,9 @@ public:
    * @return Return true, if everything is OK, or return false.
    */
   // virtual void inverseKinematics(const EVX& jnt_pos, EVX& angle) override;
-  virtual void ik(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) override;
+  // virtual void ik(const Eigen::Vector3d&, const Eigen::Quaterniond&, EVX& angle) override;
   virtual void ik(const Eigen::Vector3d&,   EVX& angle)  override;
-  virtual void ik(const Eigen::Quaterniond&, EVX& angle) override;
+  // virtual void ik(const Eigen::Quaterniond&, EVX& angle) override;
   /*！
    * @brief The forward statics solution for the foot link.
    * @param force [out] The current force output from the foot link.
